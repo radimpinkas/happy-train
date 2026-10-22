@@ -1,13 +1,14 @@
 // ============================================================================
-// MODULE 4: GAME.JS (Main Game Loop, Controls, AI Behavior & Chase Camera)
+// MODULE 4: GAME.JS (Day/Night Clock, Weather, 5 Best Friends AI & Subway Ride)
 // ============================================================================
 
-var playerLoco = createDetailedLocomotive(0xef4444, 0x2563eb, false);
+// Yellow & Red Cartoon Locomotive like the reference picture!
+var playerLoco = createDetailedLocomotive(0xfacc15, 0xef4444, false);
 scene.add(playerLoco);
-var trainHeadLight = new THREE.PointLight(0xfef08a, 0, 55);
+var trainHeadLight = new THREE.PointLight(0xfef08a, 0.5, 65);
 scene.add(trainHeadLight);
 
-var coachCols = [0x2563eb, 0x10b981, 0xf59e0b, 0xec4899, 0x8b5cf6, 0x06b6d4];
+var coachCols = [0xef4444, 0x3b82f6, 0x10b981, 0xf59e0b, 0xec4899, 0x8b5cf6];
 var playerCoaches = [];
 function addCoach() {
   var c = createDetailedCoach(coachCols[playerCoaches.length % coachCols.length]);
@@ -17,21 +18,110 @@ function addCoach() {
 }
 addCoach(); addCoach(); addCoach();
 
+// AI Trains ride strictly on `parallelCurve` (Second Track -> Zero Collisions!)
 var aiTrains = [
-  { loco: createDetailedLocomotive(0xf8fafc, 0x2563eb, true), wagon: createDetailedCoach(0xf8fafc), edge: physicalTracksToRender[2], t: 0.35, baseSpeed: 0.32, vel: 0.32 },
-  { loco: createDetailedLocomotive(0x16a34a, 0x15803d, false), wagon: createDetailedCoach(0x15803d), edge: physicalTracksToRender[5], t: 0.45, baseSpeed: 0.22, vel: 0.22 }
+  { name: "🚅 Bullet Bob Shinkansen", loco: createDetailedLocomotive(0xf8fafc, 0x2563eb, true), wagon: createDetailedCoach(0xf8fafc), edge: physicalTracksToRender[2], t: 0.35, baseSpeed: 0.30, chatCooldown: 0 },
+  { name: "🚂 Rusty Steam Friend", loco: createDetailedLocomotive(0x16a34a, 0x15803d, false), wagon: createDetailedCoach(0x15803d), edge: physicalTracksToRender[5], t: 0.45, baseSpeed: 0.22, chatCooldown: 0 }
 ];
 aiTrains.forEach(function(ai) { scene.add(ai.loco, ai.wagon); });
 
+// Weather Particles (Rain 🌧️ & Snow ❄️)
+var weatherTypes = ['clear', 'rain', 'snow'];
+var currentWeatherIdx = 0;
+var weatherParticles = [];
+var weatherGeo = new THREE.SphereGeometry(0.35, 4, 4);
+var weatherMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.0 });
+for (var wi = 0; wi < 180; wi++) {
+  var wp = new THREE.Mesh(weatherGeo, weatherMat);
+  wp.position.set((Math.random() - 0.5) * 140, Math.random() * 55, (Math.random() - 0.5) * 140);
+  scene.add(wp);
+  weatherParticles.push(wp);
+}
+
+window.cycleWeather = function() {
+  currentWeatherIdx = (currentWeatherIdx + 1) % weatherTypes.length;
+  var mode = weatherTypes[currentWeatherIdx];
+  var btn = document.getElementById('weather-btn');
+  if (mode === 'clear') {
+    btn.textContent = '☀️ Weather: Clear (W)';
+    weatherMat.opacity = 0.0;
+    speakCharacter('mom', '☀️ Mom Narrator', '#ec4899', 'The sun is shining brightly over the city!');
+  } else if (mode === 'rain') {
+    btn.textContent = '🌧️ Weather: Rain (W)';
+    weatherMat.color.setHex(0xbae6fd);
+    weatherMat.opacity = 0.75;
+    speakCharacter('train', '🚂 Little Train Toby', '#ef4444', 'Pitter patter! Look at the raindrops falling!');
+  } else {
+    btn.textContent = '❄️ Weather: Snow (W)';
+    weatherMat.color.setHex(0xffffff);
+    weatherMat.opacity = 0.9;
+    speakCharacter('train', '🚂 Little Train Toby', '#ef4444', 'Hooray! Soft white snowflakes are falling all around us!');
+  }
+};
+
+// 5-Minute Day/Night Analog Clock (300 seconds = 24 hours)
+var gameTimeSeconds = 125; // Starts around 10:00 AM
+function updateClockAndLighting(dt) {
+  gameTimeSeconds = (gameTimeSeconds + dt) % 300;
+  var hoursFloat = (gameTimeSeconds / 300) * 24;
+  var hr = Math.floor(hoursFloat);
+  var min = Math.floor((hoursFloat - hr) * 60);
+
+  // Draw Analog Clock Hands
+  var c = document.getElementById('analog-clock');
+  if (c) {
+    var ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, 42, 42);
+    ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 2.5;
+    var hAngle = ((hr % 12) + min / 60) * (Math.PI / 6) - Math.PI / 2;
+    ctx.beginPath(); ctx.moveTo(21, 21); ctx.lineTo(21 + Math.cos(hAngle) * 11, 21 + Math.sin(hAngle) * 11); ctx.stroke();
+    var mAngle = (min / 60) * (Math.PI * 2) - Math.PI / 2;
+    ctx.lineWidth = 1.8;
+    ctx.beginPath(); ctx.moveTo(21, 21); ctx.lineTo(21 + Math.cos(mAngle) * 16, 21 + Math.sin(mAngle) * 16); ctx.stroke();
+  }
+
+  var isNight = (hoursFloat >= 20 || hoursFloat < 6);
+  var isSunset = (hoursFloat >= 17.5 && hoursFloat < 20) || (hoursFloat >= 6 && hoursFloat < 7.5);
+  var phaseIcon = isNight ? '🌙' : (isSunset ? '🌅' : '☀️');
+  var phaseName = isNight ? 'Night' : (isSunset ? 'Sunset' : 'Day');
+  var padMin = min < 10 ? '0' + min : min;
+  document.getElementById('time-phase-label').textContent = phaseIcon + ' ' + hr + ':' + padMin + ' ' + phaseName;
+
+  if (pState.edge.isSubway) {
+    scene.background.lerp(metroSkyColor, 0.08);
+    hemiLight.intensity = 0.45;
+    sunLight.intensity = 0.25;
+    trainHeadLight.intensity = 3.2;
+  } else if (isNight) {
+    scene.background.lerp(nightSkyColor, 0.04);
+    hemiLight.intensity += (0.22 - hemiLight.intensity) * 0.04;
+    sunLight.intensity += (0.15 - sunLight.intensity) * 0.04;
+    playerLoco.userData.beam.material.opacity = 0.85;
+    trainHeadLight.intensity = 3.0;
+  } else if (isSunset) {
+    scene.background.lerp(sunsetSkyColor, 0.04);
+    hemiLight.intensity += (0.55 - hemiLight.intensity) * 0.04;
+    sunLight.intensity += (0.65 - sunLight.intensity) * 0.04;
+    playerLoco.userData.beam.material.opacity = 0.55;
+    trainHeadLight.intensity = 1.2;
+  } else {
+    scene.background.lerp(daySkyColor, 0.04);
+    hemiLight.intensity += (0.85 - hemiLight.intensity) * 0.04;
+    sunLight.intensity += (1.05 - sunLight.intensity) * 0.04;
+    playerLoco.userData.beam.material.opacity = 0.25;
+    trainHeadLight.intensity = 0.2;
+  }
+}
+
 var particles = [];
-var pGeo = new THREE.SphereGeometry(0.65, 8, 8);
+var pGeo = new THREE.SphereGeometry(0.7, 8, 8);
 var bCols = [0x38bdf8, 0xf472b6, 0xfacc15, 0x4ade80, 0xa78bfa];
 function spawnSmokeAndBubbles(pos, count, withBubbles) {
   for (var i = 0; i < count; i++) {
     var isB = withBubbles && (i % 2 === 0);
-    var col = isB ? bCols[i % bCols.length] : 0xffffff;
-    var m = new THREE.Mesh(pGeo, new THREE.MeshLambertMaterial({ color: col, transparent: true, opacity: 0.85 }));
-    m.position.set(pos.x + (Math.random() - 0.5), pos.y + 4.2, pos.z + (Math.random() - 0.5));
+    var col = isB ? bCols[i % bCols.length] : 0xbae6fd;
+    var m = new THREE.Mesh(pGeo, new THREE.MeshLambertMaterial({ color: col, transparent: true, opacity: 0.88 }));
+    m.position.set(pos.x + (Math.random() - 0.5), pos.y + 4.4, pos.z + (Math.random() - 0.5));
     scene.add(m);
     particles.push({ mesh: m, vy: 0.1 + Math.random() * 0.08, scale: 1.0 });
   }
@@ -62,7 +152,12 @@ var pState = {
   score: 0, itemsCount: 0,
   stationPause: 0, activeStName: null,
   waitingRed: false, atGate: false, inTunnel: false,
+  faceCamTimer: 0,
   history: []
+};
+
+window.triggerFaceCamHighlight = function(frames) {
+  pState.faceCamTimer = frames || 100;
 };
 
 var speedMap = { '-1': -0.22, '0': 0, '1': 0.15, '2': 0.26, '3': 0.38, '4': 0.52, '5': 0.68 };
@@ -109,35 +204,51 @@ window.handleInput = function(key) {
     var brL = getBranches(pState.edge);
     var nextL = (brL[pState.switchChoice] || brL.straight);
     var lblL = nextL.station ? nextL.station.name : nodes[nextL.to].name;
-    speakPureEnglish("◀", "Switch " + pState.switchChoice + " to " + lblL, true);
+    speakCharacter('mom', '👩 Mom Narrator', '#ec4899', 'Turning ' + pState.switchChoice + ' toward ' + lblL);
   } else if (key === 'ArrowRight') {
     pState.switchChoice = pState.switchChoice === 'left' ? 'straight' : 'right';
     updateHUD();
     var brR = getBranches(pState.edge);
     var nextR = (brR[pState.switchChoice] || brR.straight);
     var lblR = nextR.station ? nextR.station.name : nodes[nextR.to].name;
-    speakPureEnglish("▶", "Switch " + pState.switchChoice + " to " + lblR, true);
+    speakCharacter('mom', '👩 Mom Narrator', '#ec4899', 'Turning ' + pState.switchChoice + ' toward ' + lblR);
   } else if (key === 'ArrowUp') {
     pState.speedStage = Math.min(5, pState.speedStage + 1);
     updateHUD();
-    speakPureEnglish("⚡", "Speed " + pState.speedStage, true);
+    speakCharacter('train', '🚂 Little Train Toby', '#ef4444', 'Chugga chugga! Speed ' + pState.speedStage + '!');
   } else if (key === 'ArrowDown') {
     pState.speedStage = Math.max(-1, pState.speedStage - 1);
     updateHUD();
-    speakPureEnglish(pState.speedStage === -1 ? "🔄" : "🛑", pState.speedStage === -1 ? "Backing up in reverse!" : "Slowing down!", true);
+    speakCharacter('train', '🚂 Little Train Toby', '#ef4444', pState.speedStage === -1 ? 'Backing up! Beep beep!' : 'Slowing down!');
   } else if (key === 'Enter' || key === ' ') {
     playTrainHorn();
     spawnSmokeAndBubbles(playerLoco.position, 14, true);
-    var beam = playerLoco.userData.beam;
-    beam.material.opacity = beam.material.opacity > 0.1 ? 0.0 : 0.6;
-    speakPureEnglish("🫧", "Choo choo! Horn, steam, and colorful bubbles!", true);
+
+    // Check if near one of the 4 Metro Stations -> Dive into Underground Gnome Subway!
+    var metroSub = subwayEdges.find(function(se) {
+      return nodes[se.from].pos.distanceTo(playerLoco.position) < 42;
+    });
+    if (metroSub && !pState.edge.isSubway) {
+      pState.edge = metroSub;
+      pState.t = 0.02;
+      pState.speedStage = 3;
+      playMagicSubwaySound();
+      speakCharacter('train', '🚇 Little Train Toby', '#8b5cf6', 'Whoa! Diving into the Underground Metro Tunnel! Look at the glowing crystals and dancing gnomes!');
+      return;
+    }
+
+    // Otherwise chat with Best Friend Charlie the Helicopter!
+    playHappyLaugh();
+    speakCharacter('train', '🚂 Little Train Toby', '#ef4444', 'Hi friends! Look at my big smile and colorful bubbles!');
   } else if (key === 'm' || key === 'M') {
     window.toggleMusic();
+  } else if (key === 'w' || key === 'W') {
+    window.cycleWeather();
   }
 };
 
 window.addEventListener('keydown', function(e) {
-  if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter', ' ', 'm', 'M'].indexOf(e.key) !== -1) {
+  if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter', ' ', 'm', 'M', 'w', 'W'].indexOf(e.key) !== -1) {
     e.preventDefault();
     window.handleInput(e.key);
   }
@@ -149,7 +260,7 @@ window.reverseFromGate = function() {
   var ret = edges.find(function(e) { return e.from === pState.edge.to && e.to === pState.edge.from; });
   if (ret) { pState.edge = ret; pState.t = 0.04; }
   pState.speedStage = 2; pState.switchChoice = 'straight'; updateHUD();
-  speakPureEnglish("🔄", "Turning back to the Big City!", true);
+  speakCharacter('train', '🚂 Little Train Toby', '#ef4444', 'Turning back to our happy city!');
 };
 
 window.unlockGateWorld = function() {
@@ -159,17 +270,71 @@ window.unlockGateWorld = function() {
   var ret = edges.find(function(e) { return e.from === pState.edge.to && e.to === pState.edge.from; });
   if (ret) { pState.edge = ret; pState.t = 0.02; }
   pState.speedStage = 3; updateHUD();
-  speakPureEnglish("🎉", "Bonus World Unlocked!", true);
+  speakCharacter('mom', '🎉 Mom Narrator', '#4ade80', 'Wonderful! Bonus Adventure World unlocked!');
 };
 
 var smoothCamPos = new THREE.Vector3(-220, 32, -200);
 var smoothCamLook = new THREE.Vector3(-150, 3, -150);
+var lastFriendChatTime = 0;
 
 function animate() {
   requestAnimationFrame(animate);
   var time = Date.now() * 0.004;
 
-  // 1. Bees & Butterflies
+  // 1. Update 5-Minute Day/Night Clock & Lighting
+  updateClockAndLighting(0.016);
+
+  // 2. Animate Grand Central Water Fountain & Underground Gnomes
+  fountainDrops.forEach(function(fd) {
+    fd.progress = (fd.progress + 0.022) % 1.0;
+    var arcY = 3.0 + Math.sin(fd.progress * Math.PI) * 8.5;
+    var rad = fd.progress * 7.5;
+    fd.mesh.position.set(Math.cos(fd.angle) * rad, arcY, Math.sin(fd.angle) * rad);
+  });
+  subwayGnomes.forEach(function(gn) {
+    gn.mesh.position.y = gn.baseY + Math.abs(Math.sin(time * 3 + gn.phase)) * 1.4;
+    gn.mesh.rotation.y += 0.04;
+  });
+
+  // 3. Animate Best Friend #1: Charlie the Red Helicopter (Flies near the train & camera!)
+  heliCharlie.userData.rotor.rotation.y += 0.35;
+  var heliTargetX = playerLoco.position.x + Math.cos(time * 0.4) * 26;
+  var heliTargetZ = playerLoco.position.z + Math.sin(time * 0.4) * 26;
+  heliCharlie.position.set(heliTargetX, Math.max(18, playerLoco.position.y + 15 + Math.sin(time * 1.5) * 2.5), heliTargetZ);
+  heliCharlie.lookAt(camera.position.x, heliCharlie.position.y, camera.position.z);
+
+  // Animate Best Friend #4: Sky the Airplane flying between the 2 Airports
+  planeSky.position.set(295 + Math.sin(time * 0.3) * 45, 32 + Math.cos(time * 0.6) * 12, Math.cos(time * 0.3) * 180);
+  planeSky.lookAt(295 + Math.sin(time * 0.3 + 0.1) * 45, 32, Math.cos(time * 0.3 + 0.1) * 180);
+
+  // 4. Animate Living Road Vehicles with Faces (Buster School Bus, Barnaby Blue Car, etc.)
+  livingVehicles.forEach(function(lv, idx) {
+    lv.angle += lv.speed;
+    var rx = Math.cos(lv.angle) * (125 + idx * 14);
+    var rz = Math.sin(lv.angle) * (125 + idx * 14);
+    lv.mesh.position.set(rx, 0.2, rz);
+    lv.mesh.lookAt(
+      Math.cos(lv.angle + 0.05) * (125 + idx * 14),
+      0.2,
+      Math.sin(lv.angle + 0.05) * (125 + idx * 14)
+    );
+
+    // Best Friends Spontaneous Greeting when close to the Train!
+    if (lv.mesh.position.distanceTo(playerLoco.position) < 32 && Date.now() - lastFriendChatTime > 11000) {
+      lastFriendChatTime = Date.now();
+      playCarBeepBeep();
+      speakCharacter('friend', lv.name, '#facc15', 'Beep beep! Hi Little Train Toby! Look at my big happy smile!');
+    }
+  });
+
+  // Check Best Friend #5: Daisy the Friendly Cow Greeting
+  if (daisyTheCow.position.distanceTo(playerLoco.position) < 35 && Date.now() - lastFriendChatTime > 11000) {
+    lastFriendChatTime = Date.now();
+    playCowMoo();
+    speakCharacter('friend', '🐄 Daisy the Friendly Cow', '#22c55e', 'Moooo! Hello Little Train Toby! Have a wonderful ride!');
+  }
+
+  // 5. Bees, Butterflies, Boats, Windmill & Soccer Match
   flyingInsects.forEach(function(ins) {
     var t = time * ins.speed + ins.phase;
     ins.mesh.position.set(
@@ -183,7 +348,6 @@ function animate() {
     ins.mesh.userData.wR.rotation.z = -flap;
   });
 
-  // 2. Windmill, Boats, Soccer & Waving Humans
   windmillBlades.rotation.z -= 0.022;
   boats.forEach(function(b) {
     b.x += b.speed * b.dir;
@@ -201,50 +365,29 @@ function animate() {
     h.armPivot.rotation.z = Math.sin(time * 2.5 + h.phase) * 0.55;
   });
 
-  // 3. Crossings & Road Cars
-  activeCrossings.forEach(function(cr) {
-    cr.isClosed = playerLoco.position.distanceTo(cr.pos) < 42;
-    var tr = cr.isClosed ? 0 : Math.PI / 2.2;
-    cr.pivotL.rotation.z += (tr - cr.pivotL.rotation.z) * 0.12;
-    cr.pivotR.rotation.z += (-tr - cr.pivotR.rotation.z) * 0.12;
-  });
-  roadVehicles.forEach(function(rv) {
-    var stop = (rv.dir === 1 && rv.z > -16 && rv.z < -7) || (rv.dir === -1 && rv.z < 16 && rv.z > 7);
-    if (!(rv.crossing.isClosed && stop)) {
-      rv.z += rv.speed * rv.dir;
-      if (rv.z > 48) rv.z = -48;
-      if (rv.z < -48) rv.z = 48;
-    }
-    rv.mesh.position.set(rv.x, 0, rv.z);
-  });
-
-  // 4. Railway Signals & AI Trains
-  Object.keys(railwaySignals).forEach(function(k) {
-    var sig = railwaySignals[k];
-    sig.timer++;
-    sig.isGreen = (sig.timer % 480 < 400);
-    sig.redL.material.color.setHex(sig.isGreen ? 0x450a0a : 0xef4444);
-    sig.grnL.material.color.setHex(sig.isGreen ? 0x22c55e : 0x14532d);
-  });
-
+  // 6. AI Trains on Parallel Second Track (Never Collide with Player!)
   aiTrains.forEach(function(ai) {
-    var distToPlayer = ai.loco.position.distanceTo(playerLoco.position);
-    var blocked = distToPlayer < 24;
-    ai.vel += ((blocked ? 0 : ai.baseSpeed) - ai.vel) * 0.1;
-    ai.t += ai.vel / ai.edge.curve.getLength();
+    var pCurve = ai.edge.parallelCurve || ai.edge.curve;
+    ai.t += ai.baseSpeed / pCurve.getLength();
     if (ai.t >= 1.0) { ai.edge = getBranches(ai.edge).straight; ai.t = 0.0; }
-    var ap = ai.edge.curve.getPointAt(ai.t);
-    var atan = ai.edge.curve.getTangentAt(ai.t);
+    var ap = pCurve.getPointAt(ai.t);
+    var atan = pCurve.getTangentAt(ai.t);
     ai.loco.position.copy(ap); ai.loco.lookAt(ap.clone().add(atan));
-    var wp = ai.edge.curve.getPointAt(Math.max(0, ai.t - 0.065));
+    var wp = pCurve.getPointAt(Math.max(0, ai.t - 0.065));
     ai.wagon.position.copy(wp); ai.wagon.lookAt(ap);
+
+    if (ai.loco.position.distanceTo(playerLoco.position) < 28 && Date.now() - lastFriendChatTime > 11000) {
+      lastFriendChatTime = Date.now();
+      playTrainHorn();
+      speakCharacter('friend', ai.name, '#38bdf8', 'Choo choo! Passing you safely on the second track, best friend Toby!');
+    }
   });
 
-  // 5. Collectibles
+  // 7. Collectibles
   collectibles.forEach(function(c) {
     if (c.cooldown > 0) { c.cooldown--; if (c.cooldown === 0) c.mesh.visible = true; return; }
     c.mesh.rotation.y += 0.045;
-    if (playerLoco.position.distanceTo(c.mesh.position) < 5.2) {
+    if (playerLoco.position.distanceTo(c.mesh.position) < 5.4) {
       c.mesh.visible = false; c.cooldown = 450;
       playCollectSound();
       spawnSmokeAndBubbles(playerLoco.position, 6, true);
@@ -256,13 +399,13 @@ function animate() {
         document.getElementById('wagon-bar-fill').style.width = '0%';
         if (playerCoaches.length < 8) {
           addCoach();
-          speakPureEnglish("🚃", "Awesome! You earned a new Passenger Wagon!");
+          speakCharacter('train', '🚃 Little Train Toby', '#ef4444', 'Yay! We collected 3 treasures and got a new red wagon!');
         }
       }
     }
   });
 
-  // 6. Sheep on Tracks
+  // 8. Sheep on Tracks
   var sheepBlocking = false;
   trackSheepFlocks.forEach(function(fl) {
     var dist = playerLoco.position.distanceTo(fl.basePos);
@@ -273,7 +416,7 @@ function animate() {
         fl.honked = true;
         playTrainHorn();
         setTimeout(playSheepBaa, 250);
-        speakPureEnglish("🐑", "Baa! Sheep on the tracks! Honking so the fluffy sheep walk to the meadow!", true);
+        speakCharacter('mom', '🐑 Mom Narrator', '#ec4899', 'Oh look, fluffy sheep on the track! Toby honks gently so they step onto the grass.');
       }
     }
     if (fl.scattering && fl.offsetDist < 10.5) {
@@ -285,28 +428,16 @@ function animate() {
     }
   });
 
-  // 7. Red Signal Check
-  var sigAhead = railwaySignals[pState.edge.to];
-  var redStop = sigAhead && !sigAhead.isGreen && pState.t > 0.78 && pState.t < 0.88 && pState.speedStage > 0;
-  if (redStop && !pState.waitingRed && pState.currentVel > 0.05) {
-    pState.waitingRed = true;
-    playTrainHorn();
-    speakPureEnglish("🚦", "Red signal ahead! Honking and stopping safely!");
-  } else if (pState.waitingRed && (!sigAhead || sigAhead.isGreen)) {
-    pState.waitingRed = false;
-    speakPureEnglish("🟢", "Green signal! Clear track ahead!");
-  }
-
-  // 8. Station Stop & Boarding
+  // 9. Station Stop & Boarding
   var stCfg = pState.edge.station;
   var curSt = (stCfg && stCfg.type === 'station') ? stationPhysicals[stCfg.name] : null;
   if (curSt && !curSt.visitedThisEdge && pState.speedStage > 0 && pState.t >= 0.48 && pState.t <= 0.54) {
     curSt.visitedThisEdge = true;
-    pState.stationPause = 105;
+    pState.stationPause = 100;
     pState.currentVel = 0;
     pState.activeStName = stCfg.name;
     document.getElementById('place-label').textContent = stCfg.name;
-    speakPureEnglish(stCfg.emoji, stCfg.voice);
+    speakCharacter('mom', stCfg.emoji + ' Mom Narrator', '#ec4899', stCfg.voice);
   }
 
   if (pState.stationPause > 0) {
@@ -315,17 +446,17 @@ function animate() {
     if (stObj) {
       stObj.pax.forEach(function(p) {
         if (!p.boarded) {
-          p.dist -= 0.08;
+          p.dist += 0.08;
           var np = p.baseTrackPt.clone().add(p.perp.clone().multiplyScalar(p.dist));
           p.human.group.position.set(np.x, np.y, np.z);
-          if (p.dist <= 2.0) { p.boarded = true; p.human.group.visible = false; }
+          if (p.dist >= -2.0) { p.boarded = true; p.human.group.visible = false; }
         }
       });
       if (pState.stationPause === 1) {
         setTimeout(function() {
           stObj.pax.forEach(function(p) {
-            p.dist = 8.8; p.boarded = false;
-            var rp = p.baseTrackPt.clone().add(p.perp.clone().multiplyScalar(8.8));
+            p.dist = -8.8; p.boarded = false;
+            var rp = p.baseTrackPt.clone().add(p.perp.clone().multiplyScalar(-8.8));
             p.human.group.position.set(rp.x, rp.y, rp.z);
             p.human.group.visible = true;
           });
@@ -334,9 +465,9 @@ function animate() {
     }
   }
 
-  // 9. Smooth Acceleration & Deceleration
+  // 10. Train Movement
   var targetVel = speedMap[String(pState.speedStage)] || 0;
-  if (pState.atGate || pState.waitingRed || pState.stationPause > 0 || sheepBlocking) {
+  if (pState.atGate || pState.stationPause > 0 || sheepBlocking) {
     targetVel = 0;
   } else if (curSt && !curSt.visitedThisEdge && pState.t > 0.36 && pState.t < 0.48 && targetVel > 0.14) {
     targetVel = 0.14;
@@ -348,7 +479,7 @@ function animate() {
     var edgeLen = pState.edge.curve.getLength();
     pState.t += pState.currentVel / edgeLen;
     wheelMeshes.forEach(function(w) { w.rotation.x += pState.currentVel * 0.35; });
-    if (Math.random() < 0.22) spawnSmokeAndBubbles(playerLoco.position, 1, false);
+    if (Math.random() < 0.25) spawnSmokeAndBubbles(playerLoco.position, 1, false);
 
     if (stCfg && stCfg.type !== 'station' && Math.abs(pState.t - 0.50) < 0.015) {
       document.getElementById('place-label').textContent = stCfg.name;
@@ -383,58 +514,47 @@ function animate() {
 
   playerLoco.position.copy(pos);
   playerLoco.lookAt(pos.clone().add(tan));
+  trainHeadLight.position.copy(pos).add(tan.clone().multiplyScalar(8)).add(new THREE.Vector3(0, 4, 0));
 
   if (pState.currentVel > 0.005) {
     pState.history.unshift({ pos: pos.clone(), dir: tan.clone() });
     if (pState.history.length > 360) pState.history.pop();
-  } else if (pState.currentVel < -0.005) {
-    playerCoaches.forEach(function(c, idx) {
-      var backT = Math.max(0, ct - (idx + 1) * 0.055);
-      var bp = pState.edge.curve.getPointAt(backT);
-      var btan = pState.edge.curve.getTangentAt(backT).normalize();
-      c.position.copy(bp);
-      c.lookAt(bp.clone().add(btan));
+  }
+  playerCoaches.forEach(function(c, idx) {
+    var h = pState.history[Math.min(pState.history.length - 1, (idx + 1) * 15)];
+    if (h) { c.position.copy(h.pos); c.lookAt(h.pos.clone().add(h.dir)); }
+  });
+
+  // Update Weather Particles around the train
+  var wMode = weatherTypes[currentWeatherIdx];
+  if (wMode !== 'clear') {
+    var fallSpeed = wMode === 'rain' ? 1.4 : 0.45;
+    weatherParticles.forEach(function(wp) {
+      wp.position.y -= fallSpeed;
+      if (wp.position.y < pos.y) {
+        wp.position.y = pos.y + 48;
+        wp.position.x = pos.x + (Math.random() - 0.5) * 110;
+        wp.position.z = pos.z + (Math.random() - 0.5) * 110;
+      }
     });
   }
 
-  if (pState.currentVel >= -0.005) {
-    playerCoaches.forEach(function(c, idx) {
-      var h = pState.history[Math.min(pState.history.length - 1, (idx + 1) * 15)];
-      if (h) { c.position.copy(h.pos); c.lookAt(h.pos.clone().add(h.dir)); }
-    });
-  }
-
-  // 10. Tunnel Darkness & Camera Ducking
-  var isTunnelEdge = stCfg && stCfg.type === 'tunnel';
-  var insideTunnelNow = (isTunnelEdge && pState.t > 0.22 && pState.t < 0.78);
-  if (insideTunnelNow && !pState.inTunnel) {
-    pState.inTunnel = true;
-    playerLoco.userData.beam.material.opacity = 0.88;
-    trainHeadLight.intensity = 2.8;
-    speakPureEnglish("🔦", "Entering the dark Mountain Tunnel! Headlights on!");
-  } else if (!insideTunnelNow && pState.inTunnel) {
-    pState.inTunnel = false;
-    playerLoco.userData.beam.material.opacity = 0.4;
-    trainHeadLight.intensity = 0;
-  }
-  trainHeadLight.position.copy(pos).add(tan.clone().multiplyScalar(8)).add(new THREE.Vector3(0, 4, 0));
-
-  scene.background.lerp(insideTunnelNow ? tunnelSkyColor : daySkyColor, 0.08);
-  hemiLight.intensity += ((insideTunnelNow ? 0.18 : 0.85) - hemiLight.intensity) * 0.08;
-  sunLight.intensity += ((insideTunnelNow ? 0.12 : 1.05) - sunLight.intensity) * 0.08;
+  // Camera: Ducks inside Tunnel/Subway, or angles slightly forward during Face-Cam dialogue!
+  var isTunnelEdge = (stCfg && stCfg.type === 'tunnel' && pState.t > 0.22 && pState.t < 0.78) || pState.edge.isSubway;
+  if (pState.faceCamTimer > 0) pState.faceCamTimer--;
 
   var desiredCam;
   var desiredLook;
-  if (insideTunnelNow) {
-    desiredCam = pos.clone().sub(tan.clone().multiplyScalar(22)).add(new THREE.Vector3(0, 7.0, 0));
+  if (isTunnelEdge) {
+    desiredCam = pos.clone().sub(tan.clone().multiplyScalar(22)).add(new THREE.Vector3(0, 6.8, 0));
     desiredLook = pos.clone().add(tan.clone().multiplyScalar(18)).add(new THREE.Vector3(0, 2.5, 0));
   } else {
     desiredCam = pos.clone()
-      .sub(tan.clone().multiplyScalar(38))
-      .add(perpVec.clone().multiplyScalar(17))
-      .add(new THREE.Vector3(0, 22, 0));
+      .sub(tan.clone().multiplyScalar(36))
+      .add(perpVec.clone().multiplyScalar(18))
+      .add(new THREE.Vector3(0, 21, 0));
     desiredLook = pos.clone()
-      .add(tan.clone().multiplyScalar(12))
+      .add(tan.clone().multiplyScalar(10))
       .add(new THREE.Vector3(0, 2.5, 0));
   }
 
