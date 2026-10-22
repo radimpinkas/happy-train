@@ -1,8 +1,45 @@
 // ============================================================================
-// MODULE 3: MODELS.JS (Locomotives, Stations, Animals, Flowers, Bees & City)
+// MODULE 3: MODELS.JS (Expressive Cartoon Faces on Vehicles, 2 Airports, Fountain & Night Lights)
 // ============================================================================
 
+window.nightGlowMaterials = [];
 window.wavingHumans = [];
+
+// Creates a Cartoon Face Texture with Big Eyes & Smiling Mouth (Just like the reference image!)
+window.createCartoonFacePlane = function(width, height, bgHex) {
+  var c = document.createElement('canvas');
+  c.width = 256; c.height = 256;
+  var ctx = c.getContext('2d');
+  ctx.fillStyle = bgHex || '#facc15';
+  ctx.fillRect(0, 0, 256, 256);
+
+  // Big Cartoon Eyes
+  [78, 178].forEach(function(ex) {
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.ellipse(ex, 95, 34, 42, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.lineWidth = 6; ctx.strokeStyle = '#0f172a'; ctx.stroke();
+    // Pupil + White Glint
+    ctx.fillStyle = '#0f172a';
+    ctx.beginPath(); ctx.arc(ex, 100, 17, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(ex - 6, 90, 6, 0, Math.PI * 2); ctx.fill();
+  });
+
+  // Big Happy Cartoon Smile
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(128, 158, 52, 0.1 * Math.PI, 0.9 * Math.PI, false);
+  ctx.closePath();
+  ctx.fill();
+  ctx.lineWidth = 6; ctx.strokeStyle = '#0f172a'; ctx.stroke();
+
+  var tex = new THREE.CanvasTexture(c);
+  return new THREE.Mesh(
+    new THREE.PlaneGeometry(width, height),
+    new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide })
+  );
+};
+
 window.spawnPerson = function(x, y, z, shirtCol, hatCol, showHello, scale) {
   var g = new THREE.Group();
   g.position.set(x, y, z);
@@ -34,7 +71,7 @@ window.spawnPerson = function(x, y, z, shirtCol, hatCol, showHello, scale) {
   return obj;
 };
 
-// Build Mid-Segment Stations & Open Depot
+// Build Stations & Depot
 window.stationPhysicals = {};
 physicalTracksToRender.forEach(function(e) {
   if (!e.station) return;
@@ -48,23 +85,22 @@ physicalTracksToRender.forEach(function(e) {
     depotG.position.copy(midPt);
     depotG.rotation.y = ang;
     var wMat = new THREE.MeshStandardMaterial({ color: 0xf97316, roughness: 0.6 });
-    var wL = new THREE.Mesh(new THREE.BoxGeometry(2.0, 12, 26), wMat); wL.position.set(-9.0, 6, 0);
-    var wR = wL.clone(); wR.position.set(9.0, 6, 0);
-    var roof = new THREE.Mesh(new THREE.BoxGeometry(20, 2.2, 27), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
-    roof.position.set(0, 12.5, 0);
+    var wL = new THREE.Mesh(new THREE.BoxGeometry(2.0, 12, 26), wMat); wL.position.set(-9.5, 6, 0);
+    var wR = wL.clone(); wR.position.set(13.5, 6, 0);
+    var roof = new THREE.Mesh(new THREE.BoxGeometry(25, 2.2, 27), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
+    roof.position.set(2.0, 12.5, 0);
     var dSign = makeSign("🏗️ CENTRAL TRAIN DEPOT", "#0f172a", "#fde047", 25, 5.8);
-    dSign.position.set(0, 18, 0);
+    dSign.position.set(2.0, 18, 0);
     depotG.add(wL, wR, roof, dSign);
     scene.add(depotG);
     return;
   }
 
   if (e.station.type === 'station') {
-    var platPos = midPt.clone().add(perp.clone().multiplyScalar(9.5));
+    var platPos = midPt.clone().add(perp.clone().multiplyScalar(-9.5));
     var sg = new THREE.Group();
     sg.position.copy(platPos);
     sg.rotation.y = ang;
-
     var plat = new THREE.Mesh(new THREE.BoxGeometry(5.5, 1.2, 18), new THREE.MeshStandardMaterial({ color: 0xcbd5e1 }));
     plat.position.y = 0.6;
     var canopy = new THREE.Mesh(new THREE.BoxGeometry(6.0, 0.7, 18.5), new THREE.MeshStandardMaterial({ color: 0xdc2626 }));
@@ -74,12 +110,9 @@ physicalTracksToRender.forEach(function(e) {
     sg.add(plat, canopy, sign);
     scene.add(sg);
 
-    var smPos = midPt.clone().add(perp.clone().multiplyScalar(8.5)).add(tan.clone().multiplyScalar(6.5));
-    spawnPerson(smPos.x, midPt.y, smPos.z, 0x1e3a8a, 0xdc2626, true, 1.65);
-
     var pax = [];
     for (var pi = 0; pi < 4; pi++) {
-      var startDist = 8.8;
+      var startDist = -8.8;
       var along = (pi - 1.5) * 3.0;
       var baseTrackPt = midPt.clone().add(tan.clone().multiplyScalar(along));
       var pPos = baseTrackPt.clone().add(perp.clone().multiplyScalar(startDist));
@@ -90,68 +123,126 @@ physicalTracksToRender.forEach(function(e) {
   }
 });
 
-// Traffic Signs (STOP, Give Way, No Entry)
-function createTrafficSign(x, y, z, type, rotY) {
-  var g = new THREE.Group();
-  g.position.set(x, y, z);
-  g.rotation.y = rotY || 0;
-  var pole = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 5.2, 8), new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.6 }));
-  pole.position.y = 2.6;
-  g.add(pole);
+// --- GRAND CENTRAL SQUARE WITH ANIMATED WATER FOUNTAIN (Velké náměstí s vodotryskem) ---
+window.fountainDrops = [];
+(function buildCentralFountainSquare() {
+  var fGroup = new THREE.Group();
+  fGroup.position.set(26, 0, -26);
+  var plaza = new THREE.Mesh(new THREE.CylinderGeometry(18, 18, 0.3, 28), new THREE.MeshStandardMaterial({ color: 0xe2e8f0 }));
+  plaza.position.y = 0.15;
+  var basin = new THREE.Mesh(new THREE.CylinderGeometry(9, 10, 1.8, 24), new THREE.MeshStandardMaterial({ color: 0x38bdf8 }));
+  basin.position.y = 0.9;
+  var centerPillar = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 2.2, 5.5, 16), new THREE.MeshStandardMaterial({ color: 0xf8fafc }));
+  centerPillar.position.y = 2.8;
+  var fSign = makeSign("⛲ GRAND FOUNTAIN SQUARE", "#0284c7", "#fde047", 24, 5.5);
+  fSign.position.set(0, 13, 0);
+  fGroup.add(plaza, basin, centerPillar, fSign);
 
-  var c = document.createElement('canvas');
-  c.width = 256; c.height = 256;
-  var ctx = c.getContext('2d');
-  if (type === 'STOP') {
-    ctx.fillStyle = '#ffffff'; ctx.beginPath();
-    for (var i = 0; i < 8; i++) {
-      var a = (i * Math.PI / 4) + Math.PI / 8;
-      var px = 128 + Math.cos(a) * 118, py = 128 + Math.sin(a) * 118;
-      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-    }
-    ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#dc2626'; ctx.beginPath();
-    for (var j = 0; j < 8; j++) {
-      var a2 = (j * Math.PI / 4) + Math.PI / 8;
-      var px2 = 128 + Math.cos(a2) * 104, py2 = 128 + Math.sin(a2) * 104;
-      if (j === 0) ctx.moveTo(px2, py2); else ctx.lineTo(px2, py2);
-    }
-    ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#ffffff'; ctx.font = '900 72px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('STOP', 128, 132);
-  } else if (type === 'GIVE_WAY') {
-    ctx.fillStyle = '#dc2626'; ctx.beginPath(); ctx.moveTo(16, 36); ctx.lineTo(240, 36); ctx.lineTo(128, 236); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(52, 60); ctx.lineTo(204, 60); ctx.lineTo(128, 194); ctx.closePath(); ctx.fill();
-  } else {
-    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(128, 128, 114, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#dc2626'; ctx.beginPath(); ctx.arc(128, 128, 100, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#ffffff'; ctx.fillRect(48, 104, 160, 48);
+  var dropGeo = new THREE.SphereGeometry(0.42, 6, 6);
+  var dropMat = new THREE.MeshBasicMaterial({ color: 0xbae6fd });
+  for (var i = 0; i < 28; i++) {
+    var d = new THREE.Mesh(dropGeo, dropMat);
+    fGroup.add(d);
+    fountainDrops.push({ mesh: d, angle: (i / 28) * Math.PI * 2, progress: (i / 28) });
   }
-  var board = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 3.2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, side: THREE.DoubleSide }));
-  board.position.set(0, 5.6, 0.22);
-  g.add(board);
+  scene.add(fGroup);
+})();
+
+// --- 2 AIRPORTS WITH TALKING AIRPLANES & RED HELICOPTERS (With Eyes & Smiling Mouths!) ---
+window.aircraftList = [];
+function buildAirport(x, z, name) {
+  var ag = new THREE.Group();
+  ag.position.set(x, 0, z);
+  var runway = new THREE.Mesh(new THREE.PlaneGeometry(18, 95), new THREE.MeshStandardMaterial({ color: 0x334155 }));
+  runway.rotation.x = -Math.PI / 2; runway.position.y = 0.1;
+  var tower = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 3.2, 18, 12), new THREE.MeshStandardMaterial({ color: 0xf8fafc }));
+  tower.position.set(-14, 9, 0);
+  var towerTop = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 3.0, 4.0, 12), new THREE.MeshBasicMaterial({ color: 0x38bdf8 }));
+  towerTop.position.set(-14, 19, 0);
+  var aSign = makeSign("✈️ " + name, "#0f172a", "#38bdf8", 25, 5.8);
+  aSign.position.set(-14, 26, 0);
+  ag.add(runway, tower, towerTop, aSign);
+  scene.add(ag);
+}
+buildAirport(295, -160, "NORTH CITY AIRPORT");
+buildAirport(295,  140, "SOUTH HARBOR AIRPORT");
+
+// Build Friendly Red-and-Yellow Helicopter "Charlie" (Just like the picture!) & Airplane "Sky"
+function createTalkingHelicopter(name, bodyHex) {
+  var g = new THREE.Group();
+  var cabin = new THREE.Mesh(new THREE.SphereGeometry(3.4, 16, 16), new THREE.MeshStandardMaterial({ color: bodyHex }));
+  cabin.scale.set(1.0, 0.9, 1.45);
+  var skidStripe = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.8, 6.2), new THREE.MeshStandardMaterial({ color: 0xfacc15 }));
+  skidStripe.position.y = -1.8;
+  var tail = new THREE.Mesh(new THREE.ConeGeometry(1.1, 7.5, 8), new THREE.MeshStandardMaterial({ color: bodyHex }));
+  tail.rotation.x = -Math.PI / 2; tail.position.set(0, 0.4, -6.5);
+  var rotor = new THREE.Mesh(new THREE.BoxGeometry(13, 0.2, 1.1), new THREE.MeshBasicMaterial({ color: 0xe2e8f0 }));
+  rotor.position.y = 3.5;
+
+  // Expressive Eyes & Smile on Front of Helicopter!
+  var face = createCartoonFacePlane(3.4, 2.8, '#38bdf8');
+  face.position.set(0, 0.3, 4.95);
+
+  var tag = makeSign("🚁 " + name, "#7f1d1d", "#fde047", 16, 4);
+  tag.position.set(0, 6.5, 0);
+  g.add(cabin, skidStripe, tail, rotor, face, tag);
+  g.userData = { rotor: rotor, name: name };
   scene.add(g);
+  return g;
 }
 
-physicalTracksToRender.forEach(function(e, idx) {
-  var p25 = e.curve.getPointAt(0.22);
-  var tan = e.curve.getTangentAt(0.22).normalize();
-  var perp = new THREE.Vector3(-tan.z, 0, tan.x).normalize();
-  var signPos = p25.clone().add(perp.clone().multiplyScalar(-4.8));
-  var sType = e.to.indexOf('EXIT_') === 0 ? 'NO_ENTRY' : (idx % 2 === 0 ? 'STOP' : 'GIVE_WAY');
-  createTrafficSign(signPos.x, p25.y, signPos.z, sType, Math.atan2(tan.x, tan.z));
-});
+function createTalkingAirplane(name) {
+  var g = new THREE.Group();
+  var fuselage = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 1.8, 14, 14), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+  fuselage.rotation.x = Math.PI / 2;
+  var wings = new THREE.Mesh(new THREE.BoxGeometry(18, 0.4, 3.6), new THREE.MeshStandardMaterial({ color: 0x38bdf8 }));
+  var tailWing = new THREE.Mesh(new THREE.BoxGeometry(1.0, 4.5, 2.8), new THREE.MeshStandardMaterial({ color: 0xef4444 }));
+  tailWing.position.set(0, 2.2, -5.8);
+  var face = createCartoonFacePlane(2.8, 2.5, '#ffffff');
+  face.position.set(0, 0.2, 7.05);
+  var tag = makeSign("✈️ " + name, "#0f172a", "#38bdf8", 16, 4);
+  tag.position.set(0, 5.8, 0);
+  g.add(fuselage, wings, tailWing, face, tag);
+  scene.add(g);
+  return g;
+}
 
-// Meadow Flowers + Bees & Butterflies
+window.heliCharlie = createTalkingHelicopter("Charlie the Helicopter", 0xef4444);
+window.planeSky = createTalkingAirplane("Sky the Airplane");
+
+// --- ANTHROPOMORPHIC CARS, YELLOW SCHOOL BUS & WHITE VAN (With Eyes & Smiling Mouths!) ---
+window.livingVehicles = [];
+function createLivingRoadVehicle(name, colHex, isBus, zOffset) {
+  var g = new THREE.Group();
+  var w = isBus ? 3.2 : 2.6;
+  var h = isBus ? 3.2 : 2.1;
+  var len = isBus ? 8.2 : 4.8;
+  var body = new THREE.Mesh(new THREE.BoxGeometry(w, h, len), new THREE.MeshStandardMaterial({ color: colHex }));
+  body.position.y = h * 0.5 + 0.4;
+  var face = createCartoonFacePlane(w * 0.88, h * 0.78, isBus ? '#facc15' : '#e0f2fe');
+  face.position.set(0, h * 0.55 + 0.4, len * 0.5 + 0.08);
+  var tag = makeSign(name, "#0f172a", "#fde047", 14, 3.5);
+  tag.position.set(0, h + 2.8, 0);
+  g.add(body, face, tag);
+  scene.add(g);
+  return { mesh: g, name: name, angle: zOffset, speed: isBus ? 0.004 : 0.0055 };
+}
+
+livingVehicles.push(createLivingRoadVehicle("🚌 Buster School Bus", 0xfacc15, true, 0.0));
+livingVehicles.push(createLivingRoadVehicle("🚙 Barnaby Blue Car", 0x2563eb, false, 2.1));
+livingVehicles.push(createLivingRoadVehicle("🚗 Ruby Red Car", 0xef4444, false, 4.2));
+livingVehicles.push(createLivingRoadVehicle("🚐 Willy White Van", 0xf8fafc, true, 5.1));
+
+// --- FLOWERS, BEES, BUTTERFLIES, ANIMALS & HOUSES WITH NIGHT WINDOWS ---
 var flowerPositions = [];
 var petalColors = [0xf472b6, 0xfacc15, 0x38bdf8, 0xf87171, 0xc084fc, 0xffffff];
 var stemMat = new THREE.MeshLambertMaterial({ color: 0x15803d });
 var centerMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
 
-for (var fi = 0; fi < 280; fi++) {
+for (var fi = 0; fi < 260; fi++) {
   var fx = (Math.random() - 0.5) * 520;
   var fz = (Math.random() - 0.5) * 520;
-  if (isNearTrack(fx, fz, 8.0) || Math.abs(fz + 85) < 22) continue;
+  if (isNearTrack(fx, fz, 9.0) || Math.abs(fz + 85) < 22) continue;
   var fg = new THREE.Group();
   fg.position.set(fx, 0, fz);
   var stem = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.1, 5), stemMat); stem.position.y = 0.55;
@@ -166,7 +257,7 @@ for (var fi = 0; fi < 280; fi++) {
   }
   fg.add(stem, center);
   scene.add(fg);
-  if (flowerPositions.length < 70) flowerPositions.push(new THREE.Vector3(fx, 1.6, fz));
+  if (flowerPositions.length < 60) flowerPositions.push(new THREE.Vector3(fx, 1.6, fz));
 }
 
 window.flyingInsects = [];
@@ -197,7 +288,6 @@ flowerPositions.forEach(function(fPos, idx) {
   flyingInsects.push({ mesh: ig, basePos: fPos.clone(), phase: idx * 0.9, speed: 1.5 + (idx % 3) * 0.4 });
 });
 
-// Detailed 3D Animals
 function createDetailedAnimal(type) {
   var g = new THREE.Group();
   if (type === 'sheep') {
@@ -210,58 +300,29 @@ function createDetailedAnimal(type) {
     var head = new THREE.Mesh(new THREE.SphereGeometry(0.62, 10, 10), darkMat);
     head.scale.set(0.9, 0.95, 1.25); head.position.set(0, 1.85, 1.45);
     g.add(head);
-    [[-0.45,-0.6], [0.45,-0.6], [-0.45,0.6], [0.45,0.6]].forEach(function(p) {
-      var leg = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.14, 1.1, 8), darkMat);
-      leg.position.set(p[0], 0.55, p[1]); g.add(leg);
-    });
   } else if (type === 'cow') {
     var whiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
     var blackMat = new THREE.MeshStandardMaterial({ color: 0x0f172a });
     var body = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.45, 3.1), whiteMat); body.position.y = 1.55;
     var patch1 = new THREE.Mesh(new THREE.BoxGeometry(1.96, 0.85, 1.1), blackMat); patch1.position.set(0, 1.7, 0.3);
     var head = new THREE.Mesh(new THREE.BoxGeometry(1.15, 1.15, 1.25), whiteMat); head.position.set(0, 2.25, 1.85);
-    var snout = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.55, 0.45), new THREE.MeshStandardMaterial({ color: 0xf472b6 })); snout.position.set(0, 2.0, 2.5);
-    g.add(body, patch1, head, snout);
-    [[-0.65,-1.1], [0.65,-1.1], [-0.65,1.1], [0.65,1.1]].forEach(function(p) {
-      var leg = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.16, 1.3, 8), whiteMat);
-      leg.position.set(p[0], 0.65, p[1]); g.add(leg);
-    });
-  } else if (type === 'giraffe') {
-    var yelMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24 });
-    var spotMat = new THREE.MeshStandardMaterial({ color: 0x92400e });
-    var body = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.5, 2.9), yelMat); body.position.y = 2.2;
-    var spots = new THREE.Mesh(new THREE.BoxGeometry(1.86, 0.9, 1.6), spotMat); spots.position.set(0, 2.2, 0);
-    var neck = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.58, 4.6, 8), yelMat); neck.position.set(0, 4.4, 1.35); neck.rotation.x = 0.22;
-    var head = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.85, 1.35), yelMat); head.position.set(0, 6.5, 2.0);
-    g.add(body, spots, neck, head);
-    [[-0.6,-1.0], [0.6,-1.0], [-0.6,1.0], [0.6,1.0]].forEach(function(p) {
-      var leg = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.14, 2.1, 8), yelMat);
-      leg.position.set(p[0], 1.05, p[1]); g.add(leg);
-    });
+    var face = createCartoonFacePlane(1.1, 1.0, '#f472b6'); face.position.set(0, 2.25, 2.5);
+    g.add(body, patch1, head, face);
   } else {
-    var horseMat = new THREE.MeshStandardMaterial({ color: 0x9a3412 });
-    var body = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.35, 3.1), horseMat); body.position.y = 1.65;
-    var neck = new THREE.Mesh(new THREE.BoxGeometry(0.75, 1.8, 0.95), horseMat); neck.position.set(0, 2.6, 1.35); neck.rotation.x = 0.35;
-    var head = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.75, 1.4), horseMat); head.position.set(0, 3.3, 1.95);
-    g.add(body, neck, head);
-    [[-0.55,-1.1], [0.55,-1.1], [-0.55,1.1], [0.55,1.1]].forEach(function(p) {
-      var leg = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.14, 1.5, 8), horseMat);
-      leg.position.set(p[0], 0.75, p[1]); g.add(leg);
-    });
+    var yelMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24 });
+    var body = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.5, 2.9), yelMat); body.position.y = 2.2;
+    var neck = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.58, 4.6, 8), yelMat); neck.position.set(0, 4.4, 1.35);
+    g.add(body, neck);
   }
   return g;
 }
 
-var animalTypes = ['sheep', 'cow', 'giraffe', 'horse'];
-for (var ai = 0; ai < 48; ai++) {
-  var ax = (Math.random() - 0.5) * 500;
-  var az = (Math.random() - 0.5) * 500;
-  if (isNearTrack(ax, az, 14) || Math.abs(az + 85) < 24) continue;
-  var am = createDetailedAnimal(animalTypes[ai % 4]);
-  am.position.set(ax, 0, az);
-  am.rotation.y = Math.random() * Math.PI * 2;
-  scene.add(am);
-}
+window.daisyTheCow = createDetailedAnimal('cow');
+daisyTheCow.position.set(175, 0, -165);
+var daisySign = makeSign("🐄 Daisy the Friendly Cow", "#14532d", "#fde047", 18, 4.2);
+daisySign.position.set(0, 5.5, 0);
+daisyTheCow.add(daisySign);
+scene.add(daisyTheCow);
 
 window.trackSheepFlocks = [];
 [
@@ -278,42 +339,28 @@ window.trackSheepFlocks = [];
   for (var s = 0; s < 4; s++) {
     var sh = createDetailedAnimal('sheep');
     sh.position.set((s - 1.5) * 1.8, 0, (s % 2) * 1.5);
-    sh.scale.set(0.85, 0.85, 0.85);
     flockG.add(sh);
   }
-  var sign = makeSign("🐑 SHEEP ON TRACK!", "#7c2d12", "#fde047", 18, 4.5);
-  sign.position.set(0, 5.5, 0);
-  flockG.add(sign);
   scene.add(flockG);
   trackSheepFlocks.push({ group: flockG, basePos: pt.clone(), perp: perp, offsetDist: 0, scattering: false, honked: false });
 });
 
-// Distant Mountains, Houses, River, Boats, Windmill & Stadium
-for (var ma = 0; ma < 36; ma++) {
-  var mang = (ma / 36) * Math.PI * 2;
-  var mrad = 430 + (ma % 3) * 45;
-  var mtn = new THREE.Mesh(
-    new THREE.ConeGeometry(52 + (ma % 4) * 14, 65 + (ma % 5) * 18, 12),
-    new THREE.MeshStandardMaterial({ color: ma % 2 === 0 ? 0x16a34a : 0x15803d, roughness: 0.9 })
-  );
-  mtn.position.set(Math.cos(mang) * mrad, 28, Math.sin(mang) * mrad);
-  scene.add(mtn);
-}
+// Houses with Night-Glowing Windows
+var sharedWindowMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+nightGlowMaterials.push(sharedWindowMat);
 
 function buildHouse(x, y, z, w, d, h, wallCol, roofCol, title) {
-  if (isNearTrack(x, z, Math.max(w, d) * 0.8 + 11)) return;
+  if (isNearTrack(x, z, Math.max(w, d) * 0.8 + 12)) return;
   var g = new THREE.Group();
   g.position.set(x, y, z);
   var walls = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color: wallCol, roughness: 0.75 }));
-  walls.position.y = h / 2; walls.castShadow = true; walls.receiveShadow = true;
+  walls.position.y = h / 2; walls.castShadow = true;
   var roof = new THREE.Mesh(new THREE.ConeGeometry(Math.max(w, d) * 0.78, h * 0.55, 4), new THREE.MeshStandardMaterial({ color: roofCol }));
-  roof.position.y = h + h * 0.27; roof.rotation.y = Math.PI / 4; roof.castShadow = true;
-  var door = new THREE.Mesh(new THREE.BoxGeometry(2.2, 3.5, 0.3), new THREE.MeshStandardMaterial({ color: 0x78350f }));
-  door.position.set(0, 1.75, d / 2 + 0.1);
-  var w1 = new THREE.Mesh(new THREE.BoxGeometry(2.2, 2.2, 0.3), new THREE.MeshBasicMaterial({ color: 0xfef08a }));
+  roof.position.y = h + h * 0.27; roof.rotation.y = Math.PI / 4;
+  var w1 = new THREE.Mesh(new THREE.BoxGeometry(2.3, 2.3, 0.3), sharedWindowMat);
   w1.position.set(-w * 0.26, h * 0.6, d / 2 + 0.1);
   var w2 = w1.clone(); w2.position.set(w * 0.26, h * 0.6, d / 2 + 0.1);
-  g.add(walls, roof, door, w1, w2);
+  g.add(walls, roof, w1, w2);
   if (title) {
     var sp = makeSign(title, '#0f172a', '#fde047', 24, 5.5);
     sp.position.set(0, h + 8.5, 0);
@@ -322,35 +369,51 @@ function buildHouse(x, y, z, w, d, h, wallCol, roofCol, title) {
   scene.add(g);
 }
 
-buildHouse(-135, 0, -245, 15, 12, 9, 0xfef08a, 0xdc2626, "🏡 MOM & DAD'S HOUSE");
-spawnPerson(-125, 0, -232, 0xec4899, null, true, 1.8);
-spawnPerson(-121, 0, -232, 0x2563eb, null, true, 1.85);
+buildHouse(-145, 0, -245, 16, 12, 9, 0xfef08a, 0xdc2626, "🏡 MOM & DAD'S HOUSE");
+spawnPerson(-135, 0, -230, 0xec4899, null, true, 1.8);
+spawnPerson(-131, 0, -230, 0x2563eb, null, true, 1.85);
 
-buildHouse(-265, 0, -110, 15, 12, 8.5, 0xfed7aa, 0x9a3412, "👵 GRANDMA & GRANDPA'S");
-spawnPerson(-252, 0, -98, 0xa855f7, null, true, 1.75);
-spawnPerson(-248, 0, -98, 0x15803d, null, true, 1.8);
+buildHouse(195, 0, -235, 16, 12, 8.5, 0xfed7aa, 0x9a3412, "👵 GRANDMA & GRANDPA'S");
+spawnPerson(185, 0, -220, 0xa855f7, null, true, 1.75);
+spawnPerson(189, 0, -220, 0x15803d, null, true, 1.8);
 
-buildHouse( 85, 0, -250, 22, 14, 11, 0xfb923c, 0xb91c1c, "🏫 SUNNY SCHOOL");
-buildHouse(135, 0, -250, 16, 13, 9.5, 0xf472b6, 0x831843, "🥐 SWEET BAKERY");
-buildHouse(245, 0,  215, 26, 16, 11, 0x3b82f6, 0x1e3a8a, "🛒 MEGA HYPERMARKET");
+buildHouse( 75, 0, -255, 22, 14, 11, 0xfb923c, 0xb91c1c, "🏫 SUNNY SCHOOL");
+buildHouse(128, 0, -255, 18, 13, 9.5, 0xf472b6, 0x831843, "🎠 KINDERGARTEN");
+buildHouse(245, 0,  225, 26, 16, 11, 0x3b82f6, 0x1e3a8a, "🛒 MEGA HYPERMARKET");
+
+// Lush Forest Park with many Pine Trees (like the reference image!)
+for (var ti2 = 0; ti2 < 140; ti2++) {
+  var tx = -320 + (ti2 % 14) * 14;
+  var tz = -120 + Math.floor(ti2 / 14) * 22;
+  if (isNearTrack(tx, tz, 11)) continue;
+  var pine = new THREE.Group();
+  pine.position.set(tx, 0, tz);
+  var tr = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 2.5, 6), new THREE.MeshStandardMaterial({ color: 0x78350f }));
+  tr.position.y = 1.25;
+  var c1 = new THREE.Mesh(new THREE.ConeGeometry(2.8, 6.0, 8), new THREE.MeshStandardMaterial({ color: 0x065f46 }));
+  c1.position.y = 4.5;
+  var c2 = new THREE.Mesh(new THREE.ConeGeometry(2.1, 5.0, 8), new THREE.MeshStandardMaterial({ color: 0x047857 }));
+  c2.position.y = 7.2;
+  pine.add(tr, c1, c2);
+  scene.add(pine);
+}
 
 var wCols = [0xfef08a, 0xbae6fd, 0xfbcfe8, 0xfed7aa, 0xd9f99d];
 var rCols = [0xdc2626, 0x1d4ed8, 0x047857, 0x7c2d12, 0x6d28d9];
-for (var hx = -260; hx <= 260; hx += 48) {
-  for (var hz = -240; hz <= 240; hz += 48) {
-    if (Math.abs(hz + 85) < 28) continue;
+for (var hx = -220; hx <= 220; hx += 52) {
+  for (var hz = -200; hz <= 200; hz += 52) {
+    if (Math.abs(hz + 85) < 28 || Math.hypot(hx, hz) < 42) continue;
     var ci = Math.abs(Math.floor(hx + hz)) % wCols.length;
     buildHouse(hx, 0, hz, 10, 9, 7.5 + (ci % 3) * 1.5, wCols[ci], rCols[ci], null);
   }
 }
 
 var river = new THREE.Mesh(new THREE.PlaneGeometry(980, 36), new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.25 }));
-river.rotation.x = -Math.PI / 2;
-river.position.set(0, 0.08, -85);
+river.rotation.x = -Math.PI / 2; river.position.set(0, 0.08, -85);
 scene.add(river);
 
 window.boats = [];
-for (var bi = 0; bi < 6; bi++) {
+for (var bi = 0; bi < 5; bi++) {
   var bg = new THREE.Group();
   var hull = new THREE.Mesh(new THREE.BoxGeometry(8, 1.8, 3.8), new THREE.MeshStandardMaterial({ color: [0xffffff, 0xef4444, 0xfacc15][bi % 3] }));
   hull.position.y = 0.9;
@@ -358,12 +421,11 @@ for (var bi = 0; bi < 6; bi++) {
   sail.position.set(0, 5.2, 0);
   bg.add(hull, sail);
   scene.add(bg);
-  boats.push({ mesh: bg, x: -250 + bi * 90, dir: bi % 2 === 0 ? 1 : -1, speed: 0.22 });
+  boats.push({ mesh: bg, x: -240 + bi * 95, dir: bi % 2 === 0 ? 1 : -1, speed: 0.22 });
 }
 
 window.windmillBlades = new THREE.Group();
-var wmG = new THREE.Group();
-wmG.position.set(-150, 0, 260);
+var wmG = new THREE.Group(); wmG.position.set(-150, 0, 260);
 var wmTower = new THREE.Mesh(new THREE.CylinderGeometry(3.8, 6.2, 22, 12), new THREE.MeshStandardMaterial({ color: 0xfef3c7 }));
 wmTower.position.y = 11;
 windmillBlades.position.set(0, 19, 4.3);
@@ -377,8 +439,7 @@ wmG.add(wmTower, windmillBlades);
 scene.add(wmG);
 
 window.soccerPlayers = [];
-var stadG = new THREE.Group();
-stadG.position.set(-245, 0, 235);
+var stadG = new THREE.Group(); stadG.position.set(-245, 0, 235);
 var pitch = new THREE.Mesh(new THREE.CircleGeometry(24, 28), new THREE.MeshStandardMaterial({ color: 0x16a34a }));
 pitch.rotation.x = -Math.PI / 2; pitch.position.y = 0.25;
 window.soccerBall = new THREE.Mesh(new THREE.SphereGeometry(1.0, 10, 10), new THREE.MeshBasicMaterial({ color: 0xffffff }));
@@ -395,40 +456,14 @@ stSign.position.set(0, 16, 0);
 stadG.add(stSign);
 scene.add(stadG);
 
-// Crossings, Signals & Collectibles
 window.activeCrossings = [];
 window.roadVehicles = [];
-[{ x: -75, z: 228 }, { x: 75, z: 228 }].forEach(function(cr) {
-  var cg = new THREE.Group();
-  cg.position.set(cr.x, 0.08, cr.z);
-  var rd = new THREE.Mesh(new THREE.PlaneGeometry(9, 100), new THREE.MeshStandardMaterial({ color: 0x334155 }));
-  rd.rotation.x = -Math.PI / 2;
-  var pivotL = new THREE.Group(); pivotL.position.set(-5.2, 2.2, -7.5);
-  var armL = new THREE.Mesh(new THREE.BoxGeometry(9.5, 0.4, 0.4), new THREE.MeshStandardMaterial({ color: 0xef4444 }));
-  armL.position.x = 4.75; pivotL.add(armL);
-  var pivotR = new THREE.Group(); pivotR.position.set(5.2, 2.2, 7.5);
-  var armR = new THREE.Mesh(new THREE.BoxGeometry(9.5, 0.4, 0.4), new THREE.MeshStandardMaterial({ color: 0xef4444 }));
-  armR.position.x = -4.75; pivotR.add(armR);
-  cg.add(rd, pivotL, pivotR);
-  scene.add(cg);
-
-  var cObj = { pos: new THREE.Vector3(cr.x, 0, cr.z), pivotL: pivotL, pivotR: pivotR, isClosed: false };
-  activeCrossings.push(cObj);
-
-  [-1, 1].forEach(function(dir) {
-    var car = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.5, 4.2), new THREE.MeshStandardMaterial({ color: dir === 1 ? 0xef4444 : 0x3b82f6 }));
-    car.position.y = 0.85;
-    cg.add(car);
-    roadVehicles.push({ mesh: car, crossing: cObj, dir: dir, z: -dir * 24, x: dir * 2.1, speed: 0.25 });
-  });
-});
-
 window.railwaySignals = {};
 Object.keys(nodes).forEach(function(k, idx) {
   var n = nodes[k];
   if (n.isExit) return;
   var sg = new THREE.Group();
-  sg.position.set(n.pos.x - 5.5, n.pos.y, n.pos.z + 5.5);
+  sg.position.set(n.pos.x - 6.5, n.pos.y, n.pos.z + 6.5);
   var pole = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 7), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
   pole.position.y = 3.5;
   var box = new THREE.Mesh(new THREE.BoxGeometry(1.3, 2.8, 1.3), new THREE.MeshStandardMaterial({ color: 0x0f172a }));
@@ -459,48 +494,36 @@ physicalTracksToRender.forEach(function(e, idx) {
   });
 });
 
-// Detailed Locomotive & Passenger Coaches
+// --- YELLOW & RED CARTOON LOCOMOTIVE WITH SMILING FACE ON FRONT (Just like the picture!) ---
 window.wheelMeshes = [];
 window.createDetailedLocomotive = function(primaryHex, cabinHex, isBullet) {
   var g = new THREE.Group();
-  g.scale.set(0.75, 0.75, 0.75);
-  var chassis = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.9, 8.8), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
+  g.scale.set(0.76, 0.76, 0.76);
+  var chassis = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.9, 8.8), new THREE.MeshStandardMaterial({ color: 0xdc2626 }));
   chassis.position.set(0, 1.1, 0);
   g.add(chassis);
 
-  if (isBullet) {
-    var bBody = new THREE.Mesh(new THREE.BoxGeometry(3.5, 3.2, 7.8), new THREE.MeshStandardMaterial({ color: primaryHex, roughness: 0.2 }));
-    bBody.position.set(0, 2.8, -0.5);
-    var bStripe = new THREE.Mesh(new THREE.BoxGeometry(3.58, 0.55, 7.85), new THREE.MeshStandardMaterial({ color: cabinHex }));
-    bStripe.position.set(0, 2.2, -0.5);
-    var bNose = new THREE.Mesh(new THREE.ConeGeometry(2.4, 5.5, 12), new THREE.MeshStandardMaterial({ color: primaryHex, roughness: 0.2 }));
-    bNose.rotation.x = Math.PI / 2; bNose.position.set(0, 2.3, 6.0);
-    g.add(bBody, bStripe, bNose);
-  } else {
-    var cabin = new THREE.Mesh(new THREE.BoxGeometry(3.6, 4.2, 3.5), new THREE.MeshStandardMaterial({ color: cabinHex, roughness: 0.4 }));
-    cabin.position.set(0, 3.5, -2.4); cabin.castShadow = true;
-    var cabRoof = new THREE.Mesh(new THREE.BoxGeometry(4.0, 0.45, 4.0), new THREE.MeshStandardMaterial({ color: 0xfacc15 }));
-    cabRoof.position.set(0, 5.7, -2.4);
-    var boiler = new THREE.Mesh(new THREE.CylinderGeometry(1.55, 1.55, 5.4, 20), new THREE.MeshStandardMaterial({ color: primaryHex, roughness: 0.35 }));
-    boiler.rotation.x = Math.PI / 2; boiler.position.set(0, 2.9, 1.6); boiler.castShadow = true;
+  var cabin = new THREE.Mesh(new THREE.BoxGeometry(3.6, 4.2, 3.6), new THREE.MeshStandardMaterial({ color: cabinHex, roughness: 0.35 }));
+  cabin.position.set(0, 3.5, -2.4); cabin.castShadow = true;
+  var cabRoof = new THREE.Mesh(new THREE.BoxGeometry(4.1, 0.55, 4.1), new THREE.MeshStandardMaterial({ color: 0xdc2626 }));
+  cabRoof.position.set(0, 5.7, -2.4);
 
-    var brassMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.6, roughness: 0.2 });
-    [-0.2, 1.6, 3.4].forEach(function(bz) {
-      var ring = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 0.22, 20), brassMat);
-      ring.rotation.x = Math.PI / 2; ring.position.set(0, 2.9, bz);
-      g.add(ring);
-    });
-    var chimney = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.42, 2.1, 14), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
-    chimney.position.set(0, 4.8, 3.1);
-    var cowcatcher = new THREE.Mesh(new THREE.ConeGeometry(2.2, 1.8, 4), new THREE.MeshStandardMaterial({ color: 0xdc2626 }));
-    cowcatcher.rotation.x = Math.PI / 2; cowcatcher.rotation.z = Math.PI / 4; cowcatcher.position.set(0, 1.1, 4.9);
-    var wSide = new THREE.Mesh(new THREE.BoxGeometry(3.7, 1.3, 1.8), new THREE.MeshBasicMaterial({ color: 0xfef08a }));
-    wSide.position.set(0, 4.1, -2.4);
-    g.add(cabin, cabRoof, boiler, chimney, cowcatcher, wSide);
-  }
+  var boiler = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 5.4, 20), new THREE.MeshStandardMaterial({ color: primaryHex, roughness: 0.3 }));
+  boiler.rotation.x = Math.PI / 2; boiler.position.set(0, 2.9, 1.6); boiler.castShadow = true;
 
-  var wheelMat = new THREE.MeshStandardMaterial({ color: 0xdc2626 });
-  var rimMat = new THREE.MeshStandardMaterial({ color: 0xfacc15 });
+  // Expressive Cartoon Eyes & Smiling Mouth right on the front of the train!
+  var frontFace = createCartoonFacePlane(2.7, 2.7, isBullet ? '#38bdf8' : '#facc15');
+  frontFace.position.set(0, 2.9, 4.38);
+
+  var chimney = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.48, 2.2, 14), new THREE.MeshStandardMaterial({ color: 0xdc2626 }));
+  chimney.position.set(0, 4.8, 3.0);
+
+  var wSide = new THREE.Mesh(new THREE.BoxGeometry(3.7, 1.4, 1.9), sharedWindowMat);
+  wSide.position.set(0, 4.1, -2.4);
+  g.add(cabin, cabRoof, boiler, frontFace, chimney, wSide);
+
+  var wheelMat = new THREE.MeshStandardMaterial({ color: 0x06b6d4 });
+  var rimMat = new THREE.MeshStandardMaterial({ color: 0xdc2626 });
   [-2.6, 0.0, 2.6].forEach(function(wz) {
     [-1.85, 1.85].forEach(function(wx) {
       var wg = new THREE.Group();
@@ -515,10 +538,10 @@ window.createDetailedLocomotive = function(primaryHex, cabinHex, isBullet) {
   });
 
   var beam = new THREE.Mesh(
-    new THREE.ConeGeometry(4.8, 22, 16, 1, true),
-    new THREE.MeshBasicMaterial({ color: 0xfef08a, transparent: true, opacity: 0.45, side: THREE.DoubleSide })
+    new THREE.ConeGeometry(5.2, 24, 16, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0xfef08a, transparent: true, opacity: 0.4, side: THREE.DoubleSide })
   );
-  beam.rotation.x = -Math.PI / 2; beam.position.set(0, 1.8, 15.5);
+  beam.rotation.x = -Math.PI / 2; beam.position.set(0, 1.8, 16.0);
   g.userData.beam = beam;
   g.add(beam);
   return g;
@@ -526,21 +549,18 @@ window.createDetailedLocomotive = function(primaryHex, cabinHex, isBullet) {
 
 window.createDetailedCoach = function(colHex) {
   var g = new THREE.Group();
-  g.scale.set(0.75, 0.75, 0.75);
-  var frame = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.7, 7.6), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
+  g.scale.set(0.76, 0.76, 0.76);
+  var frame = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.7, 7.4), new THREE.MeshStandardMaterial({ color: 0xfacc15 }));
   frame.position.set(0, 1.0, 0);
-  var body = new THREE.Mesh(new THREE.BoxGeometry(3.3, 3.2, 6.8), new THREE.MeshStandardMaterial({ color: colHex, roughness: 0.35 }));
-  body.position.set(0, 2.8, 0); body.castShadow = true;
-  var roof = new THREE.Mesh(new THREE.BoxGeometry(3.55, 0.5, 7.1), new THREE.MeshStandardMaterial({ color: 0xf8fafc }));
-  roof.position.set(0, 4.5, 0);
-  var stripe = new THREE.Mesh(new THREE.BoxGeometry(3.36, 0.3, 6.82), new THREE.MeshStandardMaterial({ color: 0xfacc15 }));
-  stripe.position.set(0, 1.9, 0);
-  var winMat = new THREE.MeshBasicMaterial({ color: 0xfef9c3 });
+  var body = new THREE.Mesh(new THREE.BoxGeometry(3.3, 2.9, 6.6), new THREE.MeshStandardMaterial({ color: colHex, roughness: 0.35 }));
+  body.position.set(0, 2.6, 0); body.castShadow = true;
+  var roof = new THREE.Mesh(new THREE.BoxGeometry(3.55, 0.45, 6.9), new THREE.MeshStandardMaterial({ color: 0xfef08a }));
+  roof.position.set(0, 4.2, 0);
   [-2.0, 0.0, 2.0].forEach(function(wz) {
-    var wBox = new THREE.Mesh(new THREE.BoxGeometry(3.42, 1.1, 1.3), winMat);
-    wBox.position.set(0, 3.0, wz);
+    var wBox = new THREE.Mesh(new THREE.BoxGeometry(3.42, 1.1, 1.3), sharedWindowMat);
+    wBox.position.set(0, 2.8, wz);
     g.add(wBox);
   });
-  g.add(frame, body, roof, stripe);
+  g.add(frame, body, roof);
   return g;
 };
