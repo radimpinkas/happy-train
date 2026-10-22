@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Happy Train World 2.5D - Smart TV</title>
+  <title>Happy Train World 2.5D - Smart TV Edition v8</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
     body, html { width: 100vw; height: 100vh; overflow: hidden; background: #0f172a; font-family: 'Segoe UI', system-ui, sans-serif; }
@@ -17,53 +17,97 @@
     }
 
     #top-bar {
-      position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
-      width: 97vw; max-width: 1560px; background: rgba(15, 23, 42, 0.92);
-      padding: 8px 18px; border-radius: 20px; border: 2px solid rgba(255,255,255,0.22);
+      position: fixed; top: 8px; left: 50%; transform: translateX(-50%);
+      width: 98vw; max-width: 1640px; background: rgba(15, 23, 42, 0.92);
+      padding: 7px 16px; border-radius: 20px; border: 2px solid rgba(255,255,255,0.22);
       color: white; display: flex; align-items: center; justify-content: space-between;
       z-index: 10; backdrop-filter: blur(10px); box-shadow: 0 10px 30px rgba(0,0,0,0.5);
       flex-wrap: wrap; gap: 8px;
     }
     .hud-box { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 800; }
-    .badge-place { background: #38bdf8; color: #0f172a; padding: 5px 12px; border-radius: 10px; font-weight: 900; font-size: 15px; }
+    .badge-place { background: #38bdf8; color: #0f172a; padding: 5px 12px; border-radius: 10px; font-weight: 900; font-size: 14px; }
+
+    /* ANALOG CLOCK & WEATHER */
+    .clock-panel {
+      display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.1);
+      padding: 4px 12px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.2);
+    }
+    #analog-clock { width: 42px; height: 42px; border-radius: 50%; background: #fef08a; border: 3px solid #f59e0b; }
 
     .pill-btn {
-      background: #4ade80; color: #052e16; border: none; padding: 6px 11px;
-      border-radius: 10px; font-weight: 900; font-size: 13px; cursor: pointer;
+      background: #4ade80; color: #052e16; border: none; padding: 6px 10px;
+      border-radius: 10px; font-weight: 900; font-size: 12px; cursor: pointer;
     }
-
     .music-panel {
-      display: flex; align-items: center; gap: 8px;
-      background: rgba(255,255,255,0.09); padding: 4px 12px;
+      display: flex; align-items: center; gap: 6px;
+      background: rgba(255,255,255,0.09); padding: 4px 10px;
       border-radius: 12px; border: 1px solid rgba(255,255,255,0.2);
     }
     #music-toggle-btn { background: #facc15; color: #0f172a; }
     #music-toggle-btn.playing { background: #4ade80; color: #052e16; }
-    #music-vol { width: 75px; accent-color: #4ade80; cursor: pointer; }
+    #music-vol { width: 65px; accent-color: #4ade80; cursor: pointer; }
 
     #giant-direction-card {
-      position: fixed; top: 74px; left: 50%; transform: translateX(-50%);
+      position: fixed; top: 72px; left: 50%; transform: translateX(-50%);
       background: rgba(15, 23, 42, 0.92); border: 4px solid #4ade80;
-      border-radius: 24px; padding: 6px 24px; display: flex; align-items: center; gap: 14px;
+      border-radius: 24px; padding: 6px 22px; display: flex; align-items: center; gap: 14px;
       z-index: 12; box-shadow: 0 12px 30px rgba(0,0,0,0.55); transition: all 0.2s;
     }
     #arrow-svg-wrap {
-      width: 56px; height: 56px; display: flex; align-items: center; justify-content: center;
+      width: 52px; height: 52px; display: flex; align-items: center; justify-content: center;
       border-radius: 14px; background: rgba(255,255,255,0.1);
     }
-    #dir-title { font-size: 22px; font-weight: 900; color: #4ade80; }
-    #dir-subtitle { font-size: 13px; color: #cbd5e1; font-weight: 700; }
+    #dir-title { font-size: 20px; font-weight: 900; color: #4ade80; }
+    #dir-subtitle { font-size: 12px; color: #cbd5e1; font-weight: 700; }
+
+    /* TALKING FACE-CAM PORTRAIT (Shows Train & Friend Face when speaking!) */
+    #face-cam-card {
+      position: fixed; top: 152px; left: 50%; transform: translateX(-50%) scale(0.85);
+      background: linear-gradient(135deg, #ffffff, #e0f2fe); color: #0f172a;
+      padding: 10px 22px; border-radius: 26px; font-size: 19px; font-weight: 800;
+      box-shadow: 0 14px 36px rgba(0,0,0,0.55); border: 5px solid #facc15;
+      opacity: 0; pointer-events: none; transition: all 0.24s; z-index: 18;
+      display: flex; align-items: center; gap: 16px; max-width: 88vw;
+    }
+    #face-cam-card.visible { opacity: 1; transform: translateX(-50%) scale(1); }
+    #face-avatar {
+      width: 68px; height: 68px; border-radius: 50%; background: #ef4444;
+      border: 4px solid #facc15; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; flex-shrink: 0; position: relative;
+      box-shadow: inset 0 -6px 0 rgba(0,0,0,0.2);
+    }
+    .avatar-eyes { display: flex; gap: 10px; margin-bottom: 4px; }
+    .avatar-eye {
+      width: 16px; height: 18px; background: #fff; border-radius: 50%;
+      position: relative; border: 2px solid #0f172a;
+    }
+    .avatar-pupil {
+      width: 8px; height: 8px; background: #0f172a; border-radius: 50%;
+      position: absolute; top: 4px; left: 3px;
+    }
+    #avatar-mouth {
+      width: 24px; height: 12px; background: #0f172a; border-radius: 0 0 14px 14px;
+      border: 2px solid #fff; transition: height 0.1s;
+    }
+    #face-cam-card.talking #avatar-mouth {
+      animation: mouthTalk 0.22s infinite alternate;
+    }
+    @keyframes mouthTalk {
+      0% { height: 6px; border-radius: 6px; }
+      100% { height: 18px; border-radius: 0 0 16px 16px; }
+    }
+    #speaker-tag { font-size: 12px; font-weight: 900; text-transform: uppercase; color: #0284c7; margin-bottom: 2px; }
 
     .score-pill {
       background: linear-gradient(135deg, #ec4899, #8b5cf6);
-      padding: 5px 12px; border-radius: 12px; font-size: 15px; font-weight: 900;
+      padding: 5px 12px; border-radius: 12px; font-size: 14px; font-weight: 900;
       display: flex; align-items: center; gap: 8px;
     }
-    .wagon-bar-wrap { width: 70px; height: 11px; background: rgba(255,255,255,0.2); border-radius: 8px; overflow: hidden; }
+    .wagon-bar-wrap { width: 60px; height: 10px; background: rgba(255,255,255,0.2); border-radius: 8px; overflow: hidden; }
     #wagon-bar-fill { height: 100%; width: 0%; background: #fde047; transition: width 0.25s; }
 
     .speed-steps { display: flex; gap: 4px; align-items: center; }
-    .speed-dot { width: 16px; height: 13px; border-radius: 4px; background: rgba(255,255,255,0.18); }
+    .speed-dot { width: 15px; height: 12px; border-radius: 4px; background: rgba(255,255,255,0.18); }
     .speed-dot.on-rev { background: #38bdf8; }
     .speed-dot.on-1 { background: #86efac; }
     .speed-dot.on-2 { background: #4ade80; }
@@ -71,30 +115,21 @@
     .speed-dot.on-4 { background: #f97316; }
     .speed-dot.on-5 { background: #ef4444; }
 
-    #speech-banner {
-      position: fixed; top: 158px; left: 50%; transform: translateX(-50%) scale(0.85);
-      background: #ffffff; color: #0f172a; padding: 10px 24px; border-radius: 22px;
-      font-size: 20px; font-weight: 800; box-shadow: 0 12px 32px rgba(0,0,0,0.45);
-      border: 4px solid #38bdf8; opacity: 0; pointer-events: none;
-      transition: all 0.22s; z-index: 15; display: flex; align-items: center; gap: 12px;
-    }
-    #speech-banner.visible { opacity: 1; transform: translateX(-50%) scale(1); }
-
     #hud {
       position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%);
-      display: flex; gap: 10px; background: rgba(15, 23, 42, 0.92);
-      padding: 9px 16px; border-radius: 20px; border: 2px solid rgba(255,255,255,0.22);
+      display: flex; gap: 8px; background: rgba(15, 23, 42, 0.92);
+      padding: 8px 14px; border-radius: 20px; border: 2px solid rgba(255,255,255,0.22);
       z-index: 10; backdrop-filter: blur(10px);
     }
     .btn {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      min-width: 132px; padding: 7px 12px; border-radius: 14px;
+      min-width: 126px; padding: 6px 10px; border-radius: 14px;
       background: rgba(255,255,255,0.1); color: #fff; cursor: pointer;
       border: 2px solid transparent; transition: all 0.14s;
     }
     .btn.active, .btn:active { transform: scale(1.07); background: rgba(56, 189, 248, 0.35); border-color: #38bdf8; }
-    .btn-key { font-size: 15px; font-weight: 900; background: #f8fafc; color: #0f172a; padding: 2px 10px; border-radius: 7px; margin-bottom: 3px; }
-    .btn-label { font-size: 12px; font-weight: 700; color: #e2e8f0; }
+    .btn-key { font-size: 14px; font-weight: 900; background: #f8fafc; color: #0f172a; padding: 2px 9px; border-radius: 7px; margin-bottom: 3px; }
+    .btn-label { font-size: 11px; font-weight: 700; color: #e2e8f0; }
 
     #gate-modal {
       position: fixed; inset: 0; background: rgba(15, 23, 42, 0.88);
@@ -125,8 +160,16 @@
   <div id="top-bar">
     <div class="hud-box">
       <span>📍</span>
-      <span class="badge-place" id="place-label">Mom & Dad's Hill Climb</span>
-      <button class="pill-btn" id="voice-btn" onclick="toggleVoiceEngine()">🎙️ Cloud EN</button>
+      <span class="badge-place" id="place-label">Mom & Dad's House</span>
+    </div>
+
+    <!-- ANALOG CLOCK (5-MIN DAY/NIGHT) & WEATHER BUTTON -->
+    <div class="clock-panel">
+      <canvas id="analog-clock" width="42" height="42"></canvas>
+      <div>
+        <div id="time-phase-label" style="font-size:13px; color:#fde047;">☀️ 10:00 Day</div>
+        <button class="pill-btn" id="weather-btn" onclick="cycleWeather()" style="padding:2px 8px; font-size:11px; margin-top:2px;">☀️ Weather: Clear (W)</button>
+      </div>
     </div>
 
     <div class="music-panel">
@@ -147,7 +190,7 @@
     <div class="hud-box">
       <span id="speed-label">⚡ 2/5 CRUISE</span>
       <div class="speed-steps">
-        <div class="speed-dot" id="sp-rev" title="Reverse"></div>
+        <div class="speed-dot" id="sp-rev"></div>
         <div class="speed-dot on-1" id="sp-1"></div>
         <div class="speed-dot on-2" id="sp-2"></div>
         <div class="speed-dot" id="sp-3"></div>
@@ -161,13 +204,23 @@
     <div id="arrow-svg-wrap"></div>
     <div>
       <div id="dir-title">▲ GO STRAIGHT</div>
-      <div id="dir-subtitle">Next: Hilltop School & Bakery</div>
+      <div id="dir-subtitle">Next: Sunny School & Bakery</div>
     </div>
   </div>
 
-  <div id="speech-banner">
-    <span id="speech-emoji">🚂</span>
-    <span id="speech-text">Welcome to Happy Train World! Press M or click Music to play your Suno songs!</span>
+  <!-- ANIMATED FACE-CAM POPUP WHEN TRAIN OR FRIENDS SPEAK -->
+  <div id="face-cam-card" class="visible talking">
+    <div id="face-avatar">
+      <div class="avatar-eyes">
+        <div class="avatar-eye"><div class="avatar-pupil"></div></div>
+        <div class="avatar-eye"><div class="avatar-pupil"></div></div>
+      </div>
+      <div id="avatar-mouth"></div>
+    </div>
+    <div style="text-align:left;">
+      <div id="speaker-tag">🚂 Little Train Toby & Mom Narrator</div>
+      <div id="speech-text">Hi! Look at my smiling face! Watch the clock for day & night, visit the 2 Airports, or dive into the 4 Metro Tunnels!</div>
+    </div>
   </div>
 
   <div id="hud">
@@ -189,7 +242,7 @@
     </div>
     <div class="btn" id="btn-ok" onclick="handleInput('Enter')">
       <div class="btn-key">OK / ENTER</div>
-      <div class="btn-label">Horn + Bubbles + Lights</div>
+      <div class="btn-label">Talk to Friends + Metro</div>
     </div>
   </div>
 
@@ -219,8 +272,6 @@
       if (box) { box.style.display = 'block'; box.innerHTML = '⚠️ Error on line ' + line + ' in ' + url + ':<br>' + msg; }
     };
   </script>
-
-  <!-- 3D Library & Our Clean Modular Game Files -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="audio.js"></script>
   <script src="tracks.js"></script>
