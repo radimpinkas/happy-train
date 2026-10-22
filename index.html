@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Happy Train World 2.5D - Smart TV</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body, html { width: 100vw; height: 100vh; overflow: hidden; background: #0f172a; font-family: 'Segoe UI', system-ui, sans-serif; }
+    #canvas-container { position: fixed; inset: 0; z-index: 1; }
+
+    #error-box {
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      background: #7f1d1d; color: #fef08a; padding: 24px 32px; border-radius: 20px;
+      border: 4px solid #ef4444; font-size: 18px; font-weight: 800; z-index: 100;
+      display: none; max-width: 80vw; text-align: center;
+    }
+
+    #top-bar {
+      position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
+      width: 97vw; max-width: 1560px; background: rgba(15, 23, 42, 0.92);
+      padding: 8px 18px; border-radius: 20px; border: 2px solid rgba(255,255,255,0.22);
+      color: white; display: flex; align-items: center; justify-content: space-between;
+      z-index: 10; backdrop-filter: blur(10px); box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      flex-wrap: wrap; gap: 8px;
+    }
+    .hud-box { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 800; }
+    .badge-place { background: #38bdf8; color: #0f172a; padding: 5px 12px; border-radius: 10px; font-weight: 900; font-size: 15px; }
+
+    .pill-btn {
+      background: #4ade80; color: #052e16; border: none; padding: 6px 11px;
+      border-radius: 10px; font-weight: 900; font-size: 13px; cursor: pointer;
+    }
+
+    .music-panel {
+      display: flex; align-items: center; gap: 8px;
+      background: rgba(255,255,255,0.09); padding: 4px 12px;
+      border-radius: 12px; border: 1px solid rgba(255,255,255,0.2);
+    }
+    #music-toggle-btn { background: #facc15; color: #0f172a; }
+    #music-toggle-btn.playing { background: #4ade80; color: #052e16; }
+    #music-vol { width: 75px; accent-color: #4ade80; cursor: pointer; }
+
+    #giant-direction-card {
+      position: fixed; top: 74px; left: 50%; transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.92); border: 4px solid #4ade80;
+      border-radius: 24px; padding: 6px 24px; display: flex; align-items: center; gap: 14px;
+      z-index: 12; box-shadow: 0 12px 30px rgba(0,0,0,0.55); transition: all 0.2s;
+    }
+    #arrow-svg-wrap {
+      width: 56px; height: 56px; display: flex; align-items: center; justify-content: center;
+      border-radius: 14px; background: rgba(255,255,255,0.1);
+    }
+    #dir-title { font-size: 22px; font-weight: 900; color: #4ade80; }
+    #dir-subtitle { font-size: 13px; color: #cbd5e1; font-weight: 700; }
+
+    .score-pill {
+      background: linear-gradient(135deg, #ec4899, #8b5cf6);
+      padding: 5px 12px; border-radius: 12px; font-size: 15px; font-weight: 900;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .wagon-bar-wrap { width: 70px; height: 11px; background: rgba(255,255,255,0.2); border-radius: 8px; overflow: hidden; }
+    #wagon-bar-fill { height: 100%; width: 0%; background: #fde047; transition: width 0.25s; }
+
+    .speed-steps { display: flex; gap: 4px; align-items: center; }
+    .speed-dot { width: 16px; height: 13px; border-radius: 4px; background: rgba(255,255,255,0.18); }
+    .speed-dot.on-rev { background: #38bdf8; }
+    .speed-dot.on-1 { background: #86efac; }
+    .speed-dot.on-2 { background: #4ade80; }
+    .speed-dot.on-3 { background: #facc15; }
+    .speed-dot.on-4 { background: #f97316; }
+    .speed-dot.on-5 { background: #ef4444; }
+
+    #speech-banner {
+      position: fixed; top: 158px; left: 50%; transform: translateX(-50%) scale(0.85);
+      background: #ffffff; color: #0f172a; padding: 10px 24px; border-radius: 22px;
+      font-size: 20px; font-weight: 800; box-shadow: 0 12px 32px rgba(0,0,0,0.45);
+      border: 4px solid #38bdf8; opacity: 0; pointer-events: none;
+      transition: all 0.22s; z-index: 15; display: flex; align-items: center; gap: 12px;
+    }
+    #speech-banner.visible { opacity: 1; transform: translateX(-50%) scale(1); }
+
+    #hud {
+      position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 10px; background: rgba(15, 23, 42, 0.92);
+      padding: 9px 16px; border-radius: 20px; border: 2px solid rgba(255,255,255,0.22);
+      z-index: 10; backdrop-filter: blur(10px);
+    }
+    .btn {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-width: 132px; padding: 7px 12px; border-radius: 14px;
+      background: rgba(255,255,255,0.1); color: #fff; cursor: pointer;
+      border: 2px solid transparent; transition: all 0.14s;
+    }
+    .btn.active, .btn:active { transform: scale(1.07); background: rgba(56, 189, 248, 0.35); border-color: #38bdf8; }
+    .btn-key { font-size: 15px; font-weight: 900; background: #f8fafc; color: #0f172a; padding: 2px 10px; border-radius: 7px; margin-bottom: 3px; }
+    .btn-label { font-size: 12px; font-weight: 700; color: #e2e8f0; }
+
+    #gate-modal {
+      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.88);
+      display: none; align-items: center; justify-content: center; z-index: 50;
+    }
+    #gate-modal.show { display: flex; }
+    .modal-card {
+      background: #1e293b; border: 4px solid #facc15; border-radius: 30px; padding: 32px;
+      max-width: 680px; width: 92%; color: white; text-align: center;
+    }
+    .qr-row {
+      display: flex; align-items: center; justify-content: center; gap: 20px;
+      background: rgba(255,255,255,0.06); padding: 18px; border-radius: 20px; margin: 18px 0;
+    }
+    .qr-graphic {
+      width: 100px; height: 100px; background: #fff; color: #0f172a; border-radius: 14px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 900;
+    }
+    .action-btn { font-size: 16px; font-weight: 900; padding: 12px 22px; border-radius: 14px; border: none; cursor: pointer; margin: 6px; }
+    .btn-return { background: #38bdf8; color: #0f172a; }
+    .btn-unlock { background: #4ade80; color: #052e16; }
+  </style>
+</head>
+<body>
+
+  <div id="error-box"></div>
+
+  <div id="top-bar">
+    <div class="hud-box">
+      <span>📍</span>
+      <span class="badge-place" id="place-label">Mom & Dad's Hill Climb</span>
+      <button class="pill-btn" id="voice-btn" onclick="toggleVoiceEngine()">🎙️ Cloud EN</button>
+    </div>
+
+    <div class="music-panel">
+      <button class="pill-btn" id="music-toggle-btn" onclick="toggleMusic()">🎵 Music: OFF (M)</button>
+      <button class="pill-btn" onclick="nextMusicTrack()" title="Next Song">⏭️</button>
+      <span title="Music Volume">🔉</span>
+      <input type="range" id="music-vol" min="0" max="1" step="0.05" value="0.45" oninput="changeMusicVolume(this.value)" />
+    </div>
+
+    <div class="hud-box">
+      <div class="score-pill">
+        <span>❤️💎🦆 <span id="score-val">0</span></span>
+        <div class="wagon-bar-wrap"><div id="wagon-bar-fill"></div></div>
+        <span>🚃 <span id="wagon-val">3</span></span>
+      </div>
+    </div>
+
+    <div class="hud-box">
+      <span id="speed-label">⚡ 2/5 CRUISE</span>
+      <div class="speed-steps">
+        <div class="speed-dot" id="sp-rev" title="Reverse"></div>
+        <div class="speed-dot on-1" id="sp-1"></div>
+        <div class="speed-dot on-2" id="sp-2"></div>
+        <div class="speed-dot" id="sp-3"></div>
+        <div class="speed-dot" id="sp-4"></div>
+        <div class="speed-dot" id="sp-5"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="giant-direction-card">
+    <div id="arrow-svg-wrap"></div>
+    <div>
+      <div id="dir-title">▲ GO STRAIGHT</div>
+      <div id="dir-subtitle">Next: Hilltop School & Bakery</div>
+    </div>
+  </div>
+
+  <div id="speech-banner">
+    <span id="speech-emoji">🚂</span>
+    <span id="speech-text">Welcome to Happy Train World! Press M or click Music to play your Suno songs!</span>
+  </div>
+
+  <div id="hud">
+    <div class="btn" id="btn-left" onclick="handleInput('ArrowLeft')">
+      <div class="btn-key">◀ LEFT</div>
+      <div class="btn-label">Switch Track LEFT</div>
+    </div>
+    <div class="btn" id="btn-right" onclick="handleInput('ArrowRight')">
+      <div class="btn-key">RIGHT ▶</div>
+      <div class="btn-label">Switch Track RIGHT</div>
+    </div>
+    <div class="btn" id="btn-up" onclick="handleInput('ArrowUp')">
+      <div class="btn-key">▲ UP</div>
+      <div class="btn-label">Faster (1 to 5)</div>
+    </div>
+    <div class="btn" id="btn-down" onclick="handleInput('ArrowDown')">
+      <div class="btn-key">▼ DOWN</div>
+      <div class="btn-label">Slower / Stop / Reverse</div>
+    </div>
+    <div class="btn" id="btn-ok" onclick="handleInput('Enter')">
+      <div class="btn-key">OK / ENTER</div>
+      <div class="btn-label">Horn + Bubbles + Lights</div>
+    </div>
+  </div>
+
+  <div id="gate-modal">
+    <div class="modal-card">
+      <h1 id="gate-title">🏔️ Adventure World Exit</h1>
+      <p>Unlock this bonus world for 1 EUR, or turn your train around and explore the city for free!</p>
+      <div class="qr-row">
+        <div class="qr-graphic"><div>📱 QR</div><div>1.00 EUR</div></div>
+        <div style="text-align:left;">
+          <h3 style="color:#fde047;">Unlock Bonus World (1.00 EUR)</h3>
+          <p>Scan with your phone or press <b>DOWN Arrow (▼)</b> to reverse back to the city.</p>
+        </div>
+      </div>
+      <div>
+        <button class="action-btn btn-return" onclick="reverseFromGate()">▼ Turn Back to City (Free)</button>
+        <button class="action-btn btn-unlock" onclick="unlockGateWorld()">🔓 Unlock & Drive Through</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="canvas-container"></div>
+
+  <script>
+    window.onerror = function(msg, url, line) {
+      var box = document.getElementById('error-box');
+      if (box) { box.style.display = 'block'; box.innerHTML = '⚠️ Error on line ' + line + ' in ' + url + ':<br>' + msg; }
+    };
+  </script>
+
+  <!-- 3D Library & Our Clean Modular Game Files -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="audio.js"></script>
+  <script src="tracks.js"></script>
+  <script src="models.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
