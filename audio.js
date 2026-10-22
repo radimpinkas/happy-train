@@ -1,5 +1,5 @@
 // ============================================================================
-// MODULE 1: AUDIO.JS (Suno MP3 Playlist, Web Audio Synthesizer & English Voice)
+// MODULE 1: AUDIO.JS (Multi-Voice System: Mom Narrator, Child Train, Friends & Suno MP3)
 // ============================================================================
 
 var sunoCandidateFiles = [
@@ -13,16 +13,12 @@ var isMusicPlaying = false;
 var bgMusicAudio = new Audio();
 bgMusicAudio.volume = 0.45;
 
-// Automatically advance to the next song in the list when one finishes or fails
 function playCurrentCandidate() {
   if (!isMusicPlaying) return;
   bgMusicAudio.src = sunoCandidateFiles[currentSongIndex % sunoCandidateFiles.length];
   bgMusicAudio.play().catch(function() {
-    // Try next candidate filename if one doesn't exist
     currentSongIndex++;
-    if (currentSongIndex < sunoCandidateFiles.length * 2) {
-      playCurrentCandidate();
-    }
+    if (currentSongIndex < sunoCandidateFiles.length * 2) playCurrentCandidate();
   });
 }
 
@@ -50,95 +46,106 @@ window.toggleMusic = function() {
 
 window.nextMusicTrack = function() {
   currentSongIndex = (currentSongIndex + 1) % sunoCandidateFiles.length;
-  if (!isMusicPlaying) {
-    window.toggleMusic();
-  } else {
-    playCurrentCandidate();
-  }
-  speakPureEnglish("🎵", "Switching to the next train song!", true);
+  if (!isMusicPlaying) window.toggleMusic();
+  else playCurrentCandidate();
+  speakCharacter('train', 'Little Train Toby', '#ef4444', 'Yay! Let us listen to the next happy train song!');
 };
 
 window.changeMusicVolume = function(val) {
   bgMusicAudio.volume = parseFloat(val);
 };
 
-// --- ENGLISH VOICE ENGINE (Cloud EN + System TTS Fallback) ---
-var useCloudVoice = true;
-var cloudAudio = null;
-var verifiedEnVoice = null;
-
-function findBestSystemEnVoice() {
-  if (!('speechSynthesis' in window)) return null;
-  var list = window.speechSynthesis.getVoices() || [];
-  var enOnly = list.filter(function(v) {
+// --- MULTI-ROLE VOICE ENGINE (Mom Narrator, Child Train, Best Friends) ---
+var verifiedEnVoices = [];
+function loadEnglishVoices() {
+  if (!('speechSynthesis' in window)) return;
+  var all = window.speechSynthesis.getVoices() || [];
+  verifiedEnVoices = all.filter(function(v) {
     var l = (v.lang || '').toLowerCase();
     var n = (v.name || '').toLowerCase();
     if (l.indexOf('cs') !== -1 || l.indexOf('cz') !== -1 || n.indexOf('zuzana') !== -1) return false;
     return l.indexOf('en') === 0;
   });
-  var prefs = ['Google US English', 'Google UK English Female', 'Microsoft Aria', 'Samantha', 'Daniel', 'Karen'];
-  for (var i = 0; i < prefs.length; i++) {
-    for (var j = 0; j < enOnly.length; j++) {
-      if (enOnly[j].name.indexOf(prefs[i]) !== -1) return enOnly[j];
-    }
-  }
-  return enOnly[0] || null;
 }
-
 if ('speechSynthesis' in window) {
-  verifiedEnVoice = findBestSystemEnVoice();
-  window.speechSynthesis.onvoiceschanged = function() { verifiedEnVoice = findBestSystemEnVoice(); };
+  loadEnglishVoices();
+  window.speechSynthesis.onvoiceschanged = loadEnglishVoices;
 }
 
-window.toggleVoiceEngine = function() {
-  useCloudVoice = !useCloudVoice;
-  var btn = document.getElementById('voice-btn');
-  btn.textContent = useCloudVoice ? '🎙️ Cloud EN' : '🎙️ System TTS';
-  btn.style.background = useCloudVoice ? '#4ade80' : '#fde047';
-  speakPureEnglish("🔊", useCloudVoice ? "Natural cloud English voice active!" : "System English voice active!", true);
-};
+var faceCardTimer = null;
+var cloudFallbackAudio = null;
 
-var bannerTimer = null;
-window.speakPureEnglish = function(emoji, text, force) {
-  var banner = document.getElementById('speech-banner');
-  if (banner) {
-    document.getElementById('speech-emoji').textContent = emoji;
-    document.getElementById('speech-text').textContent = text;
-    banner.classList.add('visible');
-    clearTimeout(bannerTimer);
-    bannerTimer = setTimeout(function() { banner.classList.remove('visible'); }, 4200);
+// role: 'mom' (warm gentle female) | 'train' (cheerful child) | 'friend' (playful character)
+window.speakCharacter = function(role, speakerName, avatarColorHex, text) {
+  var card = document.getElementById('face-cam-card');
+  var avatar = document.getElementById('face-avatar');
+  var tag = document.getElementById('speaker-tag');
+  var txtEl = document.getElementById('speech-text');
+
+  if (card) {
+    avatar.style.background = avatarColorHex || '#ef4444';
+    tag.textContent = speakerName;
+    txtEl.textContent = text;
+    card.classList.add('visible', 'talking');
+    clearTimeout(faceCardTimer);
+    faceCardTimer = setTimeout(function() {
+      card.classList.remove('talking');
+      setTimeout(function() { card.classList.remove('visible'); }, 900);
+    }, 4500);
   }
 
-  if (useCloudVoice) {
+  // Trigger Face-Cam zoom on the locomotive in game.js if available
+  if (window.triggerFaceCamHighlight) window.triggerFaceCamHighlight(110);
+
+  if (!verifiedEnVoices.length) loadEnglishVoices();
+
+  if (verifiedEnVoices.length > 0 && 'speechSynthesis' in window) {
     try {
-      if (cloudAudio) cloudAudio.pause();
-      var url = 'https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=en-US&q=' + encodeURIComponent(text);
-      cloudAudio = new Audio(url);
-      cloudAudio.playbackRate = 1.04;
-      var p = cloudAudio.play();
-      if (p !== undefined) p.catch(function() { speakSystemFallback(text, force); });
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.resume();
+      var u = new SpeechSynthesisUtterance(text);
+
+      // Pick warm female voice for Mom, higher voice for Child Train
+      var femalePrefs = ['Samantha', 'Victoria', 'Karen', 'Google US English', 'Microsoft Aria', 'Microsoft Jenny', 'Moira'];
+      var chosen = verifiedEnVoices[0];
+      for (var i = 0; i < femalePrefs.length; i++) {
+        var found = verifiedEnVoices.find(function(v) { return v.name.indexOf(femalePrefs[i]) !== -1; });
+        if (found) { chosen = found; break; }
+      }
+      u.voice = chosen;
+      u.lang = 'en-US';
+
+      if (role === 'mom') {
+        u.pitch = 1.06; // Warm, soothing motherly narrator
+        u.rate = 0.91;
+      } else if (role === 'train') {
+        u.pitch = 1.48; // Excited little child voice for the train!
+        u.rate = 1.04;
+      } else {
+        u.pitch = 1.28; // Playful best friend voice
+        u.rate = 0.98;
+      }
+      window.speechSynthesis.speak(u);
       return;
     } catch (e) {}
   }
-  speakSystemFallback(text, force);
+
+  // Cloud English fallback if system has no English voices installed
+  try {
+    if (cloudFallbackAudio) cloudFallbackAudio.pause();
+    var url = 'https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=en-US&q=' + encodeURIComponent(text);
+    cloudFallbackAudio = new Audio(url);
+    cloudFallbackAudio.playbackRate = role === 'train' ? 1.14 : 0.96;
+    cloudFallbackAudio.play().catch(function(){});
+  } catch (e) {}
 };
 
-function speakSystemFallback(text, force) {
-  if (!('speechSynthesis' in window)) return;
-  try {
-    if (force || !window.speechSynthesis.speaking) window.speechSynthesis.cancel();
-    window.speechSynthesis.resume();
-    if (!verifiedEnVoice) verifiedEnVoice = findBestSystemEnVoice();
-    var u = new SpeechSynthesisUtterance(text);
-    if (verifiedEnVoice) u.voice = verifiedEnVoice;
-    u.lang = 'en-US';
-    u.rate = 0.96;
-    u.pitch = 1.06;
-    window.speechSynthesis.speak(u);
-  } catch (e) {}
-}
+// Backwards-compatible wrapper
+window.speakPureEnglish = function(emoji, text) {
+  window.speakCharacter('mom', emoji + ' Mom Narrator', '#ec4899', text);
+};
 
-// --- WEB AUDIO SOUND EFFECTS ---
+// --- WEB AUDIO SYNTHESIZER (Horns, Laughs, Helicopter, Cow Moo, Sheep Baa, Magic Chime) ---
 var audioCtx = null;
 window.initAudio = function() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -152,16 +159,20 @@ function playTone(freqs, dur, type) {
     var osc = audioCtx.createOscillator();
     var gain = audioCtx.createGain();
     osc.type = type || 'triangle';
-    osc.frequency.setValueAtTime(f, now + idx * 0.05);
-    gain.gain.setValueAtTime(0.11, now + idx * 0.05);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.05 + dur);
+    osc.frequency.setValueAtTime(f, now + idx * 0.06);
+    gain.gain.setValueAtTime(0.11, now + idx * 0.06);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.06 + dur);
     osc.connect(gain);
     gain.connect(audioCtx.destination);
-    osc.start(now + idx * 0.05);
-    osc.stop(now + idx * 0.05 + dur);
+    osc.start(now + idx * 0.06);
+    osc.stop(now + idx * 0.06 + dur);
   });
 }
 
 window.playTrainHorn = function() { playTone([349.23, 440.0, 523.25], 0.65, 'triangle'); };
 window.playCollectSound = function() { playTone([587.33, 880.0, 1174.66], 0.26, 'sine'); };
-window.playSheepBaa = function() { playTone([290, 260], 0.35, 'sawtooth'); };
+window.playSheepBaa = function() { playTone([310, 275, 300], 0.32, 'sawtooth'); };
+window.playCowMoo = function() { playTone([145, 130], 0.75, 'sawtooth'); };
+window.playCarBeepBeep = function() { playTone([480, 620], 0.18, 'square'); };
+window.playHappyLaugh = function() { playTone([523, 659, 587, 784, 659], 0.14, 'sine'); };
+window.playMagicSubwaySound = function() { playTone([440, 554.37, 659.25, 880, 1108.73], 0.35, 'sine'); };
